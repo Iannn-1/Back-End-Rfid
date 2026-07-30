@@ -21,8 +21,14 @@ export interface StudentAttributes {
   id: number
   rfid_tag_uid: string
   name: string
+  email?: string
+  student_level: 'Elementary' | 'Junior High School' | 'Senior High School' | 'College'
   grade_level: string
   section: string
+  course?: string
+  status: 'Active' | 'Inactive'
+  profile_photo?: string
+  signature?: string
   parent_name: string
   parent_email: string
   parent_phone: string

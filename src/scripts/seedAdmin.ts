@@ -1,11 +1,3 @@
-/**
- * One-time seed script — creates the first admin user.
- *
- * Usage:
- *   npx ts-node src/scripts/seedAdmin.ts
- *
- * Edit the values below before running.
- */
 
 import dotenv from 'dotenv';
 dotenv.config();
