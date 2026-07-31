@@ -10,7 +10,7 @@ import { getTodayAttendance, getStats } from '../controllers/dashboardController
  */
 const router = Router()
 
-router.get('/attendance', authMiddleware, getTodayAttendance)
+router.get('/attendance', getTodayAttendance)
 router.get('/stats', authMiddleware, getStats)
 
 export default router

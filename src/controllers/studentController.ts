@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import Student, { GRADE_LEVELS, ALL_COURSES, COLLEGE_COURSES } from '../models/Student';
 import { ApiResponse, ApiErrorResponse, StudentAttributes } from '../types/models';
+import { uploadPhoto } from '../utils/uploadPhoto';
 
 interface StudentBody {
   rfid_tag_uid: string;
@@ -101,6 +102,9 @@ export async function createStudent(
       return;
     }
 
+    // Upload profile photo to Cloudinary if it's a base64 string
+    const photoUrl = profile_photo ? await uploadPhoto(profile_photo) : undefined;
+
     const student = await Student.create({
       rfid_tag_uid,
       name,
@@ -110,7 +114,7 @@ export async function createStudent(
       section,
       course,
       status,
-      profile_photo,
+      profile_photo: photoUrl ?? undefined,
       signature,
       parent_name,
       parent_email,
@@ -205,6 +209,12 @@ export async function updateStudent(
         res.status(400).json({ success: false, error: levelError });
         return;
       }
+    }
+
+    // If profile_photo is a new base64 upload, convert it to a Cloudinary URL
+    if (req.body.profile_photo && req.body.profile_photo.startsWith('data:image/')) {
+      const photoUrl = await uploadPhoto(req.body.profile_photo);
+      req.body.profile_photo = photoUrl ?? undefined;
     }
 
     await student.update(req.body);
