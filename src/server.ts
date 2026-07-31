@@ -21,21 +21,30 @@ async function ensureDatabaseExists(): Promise<void> {
     DB_NAME = '',
   } = process.env;
 
-  // Connect without specifying a database
-  const connection = await mysql2.createConnection({
-    host: DB_HOST,
-    port: parseInt(DB_PORT, 10),
-    user: DB_USER,
-    password: DB_PASSWORD,
-  });
+  if (!DB_NAME) {
+    console.warn('⚠️ DB_NAME is not set, skipping database auto-creation.');
+    return;
+  }
 
   try {
-    await connection.query(
-      `CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`
-    );
-    console.log(`✅ Database "${DB_NAME}" is ready.`);
-  } finally {
-    await connection.end();
+    // Connect without specifying a database
+    const connection = await mysql2.createConnection({
+      host: DB_HOST,
+      port: parseInt(DB_PORT, 10),
+      user: DB_USER,
+      password: DB_PASSWORD,
+    });
+
+    try {
+      await connection.query(
+        `CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`
+      );
+      console.log(`✅ Database "${DB_NAME}" is ready.`);
+    } finally {
+      await connection.end();
+    }
+  } catch (err) {
+    console.warn('⚠️ Could not execute CREATE DATABASE (it may already exist or permissions are restricted):', (err as Error).message);
   }
 }
 
