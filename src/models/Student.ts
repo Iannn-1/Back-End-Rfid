@@ -132,7 +132,7 @@ Student.init(
       defaultValue: 'Active',
     },
     profile_photo: {
-      type: DataTypes.STRING(512), // Cloudinary URL
+      type: DataTypes.TEXT('long'), // Cloudinary URL or base64 photo
       allowNull: true,
     },
     signature: {
