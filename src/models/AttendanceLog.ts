@@ -33,7 +33,7 @@ AttendanceLog.init(
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,
       references: {
-        model: 'Students',
+        model: 'students',
         key: 'id',
       },
     },
