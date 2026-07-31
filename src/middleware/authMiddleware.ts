@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
-import '../types/express.d.ts'
 
 /**
  * JWT authentication middleware (Requirements 6.1, 6.3).
