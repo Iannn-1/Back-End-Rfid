@@ -77,10 +77,11 @@ async function startServer(): Promise<void> {
   await connectWithRetry();
 
   // Step 3: Sync models in dependency order to satisfy foreign key constraints:
-  //   Users (no deps) → Students (no deps) → AttendanceLogs (FK → Students)
-  const { User, Student, AttendanceLog } = await import('./models/index');
+  //   Users (no deps) → Students (no deps) → Parents (no deps) → AttendanceLogs (FK → Students)
+  const { User, Student, AttendanceLog, Parent } = await import('./models/index');
   await User.sync({ alter: true });
   await Student.sync({ alter: true });
+  await Parent.sync({ alter: true });
   await AttendanceLog.sync({ alter: true });
   console.log('Database tables synced successfully.');
 
