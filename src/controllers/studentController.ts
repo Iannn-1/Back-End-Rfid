@@ -103,7 +103,9 @@ export async function createStudent(
     }
 
     // Upload profile photo to Cloudinary if it's a base64 string
+    console.log('[createStudent] profile_photo received:', profile_photo ? `${profile_photo.substring(0, 50)}... (${profile_photo.length} chars)` : 'none');
     const photoUrl = profile_photo ? await uploadPhoto(profile_photo) : undefined;
+    console.log('[createStudent] Cloudinary URL:', photoUrl ?? 'null — upload failed or no photo');
 
     const student = await Student.create({
       rfid_tag_uid,
