@@ -4,6 +4,7 @@ import dashboardRouter from './dashboard'
 import authRouter from './auth'
 import studentsRouter from './students'
 import parentsRouter from './parents'
+import reportsRouter from './reports'
 
 /**
  * Root API router
@@ -15,5 +16,6 @@ router.use('/api/v1/rfid', rfidRouter)
 router.use('/api/v1/dashboard', dashboardRouter)
 router.use('/api/v1/students', studentsRouter)
 router.use('/api/v1/parents', parentsRouter)
+router.use('/api/v1/reports', reportsRouter)
 
 export default router
