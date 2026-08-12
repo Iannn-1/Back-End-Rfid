@@ -112,6 +112,10 @@ async function sendEmail(
     return false;
   }
 
+  // Debug: Log which SMTP host we're using
+  const transporterOptions = (emailTransporter as any).options;
+  console.log(`[Email] Attempting to send via: ${transporterOptions?.host || 'unknown host'}:${transporterOptions?.port || 'unknown port'}`);
+
   try {
     const subject = `Attendance Alert: ${student.name} ${log.status === 'IN' ? 'Checked In' : 'Checked Out'}`;
     
