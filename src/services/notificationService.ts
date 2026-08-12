@@ -3,10 +3,11 @@
  * Sends parent/guardian email notifications when a student scans in or out.
  *
  * Requirements: 3.1, 3.2, 3.3, 3.4
- * Updated: SendGrid support for production deployment
+ * Updated: SendGrid Web API for production (SMTP blocked by Railway)
  */
 
 import nodemailer from 'nodemailer';
+import sgMail from '@sendgrid/mail';
 import { AttendanceLogAttributes, StudentAttributes } from '../types/models';
 
 // ---------------------------------------------------------------------------
@@ -14,53 +15,41 @@ import { AttendanceLogAttributes, StudentAttributes } from '../types/models';
 // ---------------------------------------------------------------------------
 
 const EMAIL_ENABLED = process.env.ENABLE_EMAIL === 'true';
+const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
+const USE_SENDGRID_API = !!(EMAIL_ENABLED && SENDGRID_API_KEY);
 
-// Email transporter (SendGrid for production, Gmail fallback for local)
-const emailTransporter = EMAIL_ENABLED
-  ? nodemailer.createTransport(
-      process.env.SENDGRID_API_KEY
-        ? {
-            // SendGrid (production)
-            host: 'smtp.sendgrid.net',
-            port: 587,
-            secure: false,
-            auth: {
-              user: 'apikey',
-              pass: process.env.SENDGRID_API_KEY,
-            },
-            connectionTimeout: 10000, // 10 second timeout
-            greetingTimeout: 10000,
-          }
-        : {
-            // Gmail (local development fallback)
-            host: process.env.SMTP_HOST || 'smtp.gmail.com',
-            port: Number(process.env.SMTP_PORT) || 587,
-            secure: false,
-            auth: {
-              user: process.env.SMTP_USER,
-              pass: process.env.SMTP_PASS,
-            },
-            connectionTimeout: 10000, // 10 second timeout
-            greetingTimeout: 10000,
-          }
-    )
+// Initialize SendGrid Web API (for production)
+if (USE_SENDGRID_API) {
+  sgMail.setApiKey(SENDGRID_API_KEY);
+}
+
+// Gmail SMTP transporter (for local development only)
+const gmailTransporter = EMAIL_ENABLED && !USE_SENDGRID_API && process.env.SMTP_HOST
+  ? nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT) || 587,
+      secure: false,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+    })
   : null;
 
 // Log email configuration on startup
-if (EMAIL_ENABLED && emailTransporter) {
-  const sendgridKey = process.env.SENDGRID_API_KEY;
-  const hasGmailConfig = !!(process.env.SMTP_HOST && process.env.SMTP_USER);
-  
+if (EMAIL_ENABLED) {
   console.log('[Email] Configuration check:');
-  console.log(`  - SENDGRID_API_KEY exists: ${!!sendgridKey}`);
-  console.log(`  - SENDGRID_API_KEY starts with SG.: ${sendgridKey?.startsWith('SG.') || false}`);
+  console.log(`  - SENDGRID_API_KEY exists: ${!!SENDGRID_API_KEY}`);
+  console.log(`  - SENDGRID_API_KEY starts with SG.: ${SENDGRID_API_KEY?.startsWith('SG.') || false}`);
   console.log(`  - Gmail SMTP_HOST exists: ${!!process.env.SMTP_HOST}`);
   console.log(`  - Gmail SMTP_USER exists: ${!!process.env.SMTP_USER}`);
   
-  if (sendgridKey) {
-    console.log('[Email] ✓ Using SendGrid for production email delivery');
-  } else if (hasGmailConfig) {
-    console.log('[Email] ⚠️ Using Gmail SMTP (local development only - will not work on Railway)');
+  if (USE_SENDGRID_API) {
+    console.log('[Email] ✓ Using SendGrid Web API for production email delivery');
+  } else if (gmailTransporter) {
+    console.log('[Email] ⚠️ Using Gmail SMTP (local development only)');
   } else {
     console.log('[Email] ✗ Email enabled but no valid configuration found');
   }
@@ -102,7 +91,7 @@ async function sendEmail(
   formattedTime: string,
   retryCount: number = 0
 ): Promise<boolean> {
-  if (!EMAIL_ENABLED || !emailTransporter) {
+  if (!EMAIL_ENABLED) {
     console.log('[Email] Email notifications disabled');
     return false;
   }
@@ -112,94 +101,107 @@ async function sendEmail(
     return false;
   }
 
-  // Debug: Log which SMTP host we're using
-  const transporterOptions = (emailTransporter as any).options;
-  console.log(`[Email] Attempting to send via: ${transporterOptions?.host || 'unknown host'}:${transporterOptions?.port || 'unknown port'}`);
+  const subject = `Attendance Alert: ${student.name} ${log.status === 'IN' ? 'Checked In' : 'Checked Out'}`;
+  
+  const htmlBody = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: linear-gradient(135deg, #1e3a8a, #831843); padding: 20px; text-align: center;">
+        <h1 style="color: #f8c22e; margin: 0;">Benedicto College</h1>
+        <p style="color: white; margin: 5px 0;">RFID Attendance System</p>
+      </div>
+      
+      <div style="padding: 30px; background: #f9fafb; border: 1px solid #e5e7eb;">
+        <h2 style="color: #1f2937; margin-top: 0;">Attendance Notification</h2>
+        
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+          <tr>
+            <td style="padding: 10px; background: white; border: 1px solid #e5e7eb; font-weight: bold;">Student:</td>
+            <td style="padding: 10px; background: white; border: 1px solid #e5e7eb;">${student.name}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px; background: white; border: 1px solid #e5e7eb; font-weight: bold;">Status:</td>
+            <td style="padding: 10px; background: white; border: 1px solid #e5e7eb;">
+              <span style="background: ${log.status === 'IN' ? '#d1fae5' : '#fee2e2'}; color: ${log.status === 'IN' ? '#065f46' : '#991b1b'}; padding: 4px 12px; border-radius: 4px; font-weight: bold;">
+                ${log.status === 'IN' ? '✓ CHECKED IN' : '← CHECKED OUT'}
+              </span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 10px; background: white; border: 1px solid #e5e7eb; font-weight: bold;">Time:</td>
+            <td style="padding: 10px; background: white; border: 1px solid #e5e7eb;">${formattedTime}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px; background: white; border: 1px solid #e5e7eb; font-weight: bold;">Date:</td>
+            <td style="padding: 10px; background: white; border: 1px solid #e5e7eb;">${new Date(log.scan_time).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</td>
+          </tr>
+        </table>
+        
+        <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
+          This is an automated message from Benedicto College RFID Attendance System.
+          <br>If you have any questions, please contact the school administration.
+        </p>
+      </div>
+      
+      <div style="background: #1f2937; padding: 15px; text-align: center; color: #9ca3af; font-size: 12px;">
+        <p style="margin: 0;">© ${new Date().getFullYear()} Benedicto College. All rights reserved.</p>
+      </div>
+    </div>
+  `;
+
+  const textBody = 
+    `Benedicto College - Attendance Notification\n\n` +
+    `Student: ${student.name}\n` +
+    `Status: ${log.status === 'IN' ? 'CHECKED IN' : 'CHECKED OUT'}\n` +
+    `Time: ${formattedTime}\n` +
+    `Date: ${new Date(log.scan_time).toDateString()}\n\n` +
+    `This is an automated message from the RFID Attendance System.`;
 
   try {
-    const subject = `Attendance Alert: ${student.name} ${log.status === 'IN' ? 'Checked In' : 'Checked Out'}`;
-    
-    const htmlBody = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background: linear-gradient(135deg, #1e3a8a, #831843); padding: 20px; text-align: center;">
-          <h1 style="color: #f8c22e; margin: 0;">Benedicto College</h1>
-          <p style="color: white; margin: 5px 0;">RFID Attendance System</p>
-        </div>
-        
-        <div style="padding: 30px; background: #f9fafb; border: 1px solid #e5e7eb;">
-          <h2 style="color: #1f2937; margin-top: 0;">Attendance Notification</h2>
-          
-          <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
-            <tr>
-              <td style="padding: 10px; background: white; border: 1px solid #e5e7eb; font-weight: bold;">Student:</td>
-              <td style="padding: 10px; background: white; border: 1px solid #e5e7eb;">${student.name}</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px; background: white; border: 1px solid #e5e7eb; font-weight: bold;">Status:</td>
-              <td style="padding: 10px; background: white; border: 1px solid #e5e7eb;">
-                <span style="background: ${log.status === 'IN' ? '#d1fae5' : '#fee2e2'}; color: ${log.status === 'IN' ? '#065f46' : '#991b1b'}; padding: 4px 12px; border-radius: 4px; font-weight: bold;">
-                  ${log.status === 'IN' ? '✓ CHECKED IN' : '← CHECKED OUT'}
-                </span>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding: 10px; background: white; border: 1px solid #e5e7eb; font-weight: bold;">Time:</td>
-              <td style="padding: 10px; background: white; border: 1px solid #e5e7eb;">${formattedTime}</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px; background: white; border: 1px solid #e5e7eb; font-weight: bold;">Date:</td>
-              <td style="padding: 10px; background: white; border: 1px solid #e5e7eb;">${new Date(log.scan_time).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</td>
-            </tr>
-          </table>
-          
-          <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
-            This is an automated message from Benedicto College RFID Attendance System.
-            <br>If you have any questions, please contact the school administration.
-          </p>
-        </div>
-        
-        <div style="background: #1f2937; padding: 15px; text-align: center; color: #9ca3af; font-size: 12px;">
-          <p style="margin: 0;">© ${new Date().getFullYear()} Benedicto College. All rights reserved.</p>
-        </div>
-      </div>
-    `;
-
-    const textBody = 
-      `Benedicto College - Attendance Notification\n\n` +
-      `Student: ${student.name}\n` +
-      `Status: ${log.status === 'IN' ? 'CHECKED IN' : 'CHECKED OUT'}\n` +
-      `Time: ${formattedTime}\n` +
-      `Date: ${new Date(log.scan_time).toDateString()}\n\n` +
-      `This is an automated message from the RFID Attendance System.`;
-
-    await emailTransporter.sendMail({
-      from: process.env.SMTP_FROM || `"Benedicto College" <${process.env.SMTP_USER}>`,
-      to: student.parent_email,
-      subject,
-      text: textBody,
-      html: htmlBody,
-    });
-
-    console.log(`[Email] ✓ Sent to ${student.parent_email} for ${student.name}`);
-    return true;
+    if (USE_SENDGRID_API) {
+      // Use SendGrid Web API (production - works on Railway)
+      console.log(`[Email] Sending via SendGrid Web API to ${student.parent_email}`);
+      
+      await sgMail.send({
+        to: student.parent_email,
+        from: process.env.SMTP_FROM || 'noreply@school.com',
+        subject,
+        text: textBody,
+        html: htmlBody,
+      });
+      
+      console.log(`[Email] ✓ Sent to ${student.parent_email} for ${student.name}`);
+      return true;
+    } else if (gmailTransporter) {
+      // Use Gmail SMTP (local development only)
+      console.log(`[Email] Sending via Gmail SMTP to ${student.parent_email}`);
+      
+      await gmailTransporter.sendMail({
+        from: process.env.SMTP_FROM || `"Benedicto College" <${process.env.SMTP_USER}>`,
+        to: student.parent_email,
+        subject,
+        text: textBody,
+        html: htmlBody,
+      });
+      
+      console.log(`[Email] ✓ Sent to ${student.parent_email} for ${student.name}`);
+      return true;
+    } else {
+      console.error('[Email] No email transporter configured');
+      return false;
+    }
   } catch (error: any) {
     const errorMsg = error.message || error.toString();
     console.error(`[Email] ✗ Failed to send to ${student.parent_email}: ${errorMsg}`);
     
-    // Don't retry timeout errors more than once on production to avoid long delays
-    const isTimeout = errorMsg.includes('timeout') || errorMsg.includes('ETIMEDOUT');
-    const maxRetries = isTimeout && process.env.NODE_ENV === 'production' ? 0 : 2;
+    // Retry logic for transient errors (not for SendGrid API, only SMTP)
+    const shouldRetry = !USE_SENDGRID_API && retryCount < 2 && 
+      (errorMsg.includes('timeout') || errorMsg.includes('ETIMEDOUT') || 
+       errorMsg.includes('ECONNREFUSED') || errorMsg.includes('ENOTFOUND'));
     
-    // Retry logic for transient network errors
-    if (retryCount < maxRetries && (isTimeout || errorMsg.includes('ECONNREFUSED') || errorMsg.includes('ENOTFOUND'))) {
-      console.log(`[Email] Retrying... (attempt ${retryCount + 1}/${maxRetries})`);
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+    if (shouldRetry) {
+      console.log(`[Email] Retrying... (attempt ${retryCount + 1}/2)`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
       return sendEmail(student, log, formattedTime, retryCount + 1);
-    }
-    
-    // Log helpful message for common errors
-    if (isTimeout) {
-      console.error('[Email] ⚠️ SMTP connection timeout - Gmail SMTP does not work on Railway. Please set up SendGrid (see EMAIL_SETUP_GUIDE.md)');
     }
     
     return false;
