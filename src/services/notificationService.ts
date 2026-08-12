@@ -14,24 +14,31 @@ import { AttendanceLogAttributes, StudentAttributes } from '../types/models';
 
 const EMAIL_ENABLED = process.env.ENABLE_EMAIL === 'true';
 
-// Email transporter (Gmail)
+// Email transporter (SendGrid for production, Gmail fallback for local)
 const emailTransporter = EMAIL_ENABLED
-  ? nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: Number(process.env.SMTP_PORT) || 587,
-      secure: false, // Use TLS
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-      // Add connection timeout and pool settings
-      connectionTimeout: 10000, // 10 seconds
-      greetingTimeout: 10000,
-      socketTimeout: 15000,
-      pool: true,
-      maxConnections: 5,
-      maxMessages: 100,
-    })
+  ? nodemailer.createTransport(
+      process.env.SENDGRID_API_KEY
+        ? {
+            // SendGrid (production)
+            host: 'smtp.sendgrid.net',
+            port: 587,
+            secure: false,
+            auth: {
+              user: 'apikey',
+              pass: process.env.SENDGRID_API_KEY,
+            },
+          }
+        : {
+            // Gmail (local development fallback)
+            host: process.env.SMTP_HOST || 'smtp.gmail.com',
+            port: Number(process.env.SMTP_PORT) || 587,
+            secure: false,
+            auth: {
+              user: process.env.SMTP_USER,
+              pass: process.env.SMTP_PASS,
+            },
+          }
+    )
   : null;
 
 // ---------------------------------------------------------------------------
@@ -66,7 +73,7 @@ async function sendEmail(
   student: StudentAttributes,
   log: AttendanceLogAttributes,
   formattedTime: string,
-  retryCount = 0
+  retryCount: number = 0
 ): Promise<boolean> {
   if (!EMAIL_ENABLED || !emailTransporter) {
     console.log('[Email] Email notifications disabled');
@@ -148,10 +155,10 @@ async function sendEmail(
     const errorMsg = error.message || error.toString();
     console.error(`[Email] ✗ Failed to send to ${student.parent_email}: ${errorMsg}`);
     
-    // Retry logic for connection errors
-    if (retryCount < 2 && (errorMsg.includes('timeout') || errorMsg.includes('ETIMEDOUT') || errorMsg.includes('ECONNREFUSED'))) {
+    // Retry logic for transient network errors (up to 2 retries)
+    if (retryCount < 2 && (errorMsg.includes('timeout') || errorMsg.includes('ETIMEDOUT') || errorMsg.includes('ECONNREFUSED') || errorMsg.includes('ENOTFOUND'))) {
       console.log(`[Email] Retrying... (attempt ${retryCount + 1}/2)`);
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
       return sendEmail(student, log, formattedTime, retryCount + 1);
     }
     
