@@ -1,11 +1,31 @@
 /**
  * Notification service for the School Attendance Monitoring System.
- * Sends parent/guardian notifications when a student scans in or out.
+ * Sends parent/guardian email notifications when a student scans in or out.
  *
  * Requirements: 3.1, 3.2, 3.3, 3.4
  */
 
+import nodemailer from 'nodemailer';
 import { AttendanceLogAttributes, StudentAttributes } from '../types/models';
+
+// ---------------------------------------------------------------------------
+// Configuration
+// ---------------------------------------------------------------------------
+
+const EMAIL_ENABLED = process.env.ENABLE_EMAIL === 'true';
+
+// Email transporter (Gmail)
+const emailTransporter = EMAIL_ENABLED
+  ? nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: Number(process.env.SMTP_PORT) || 587,
+      secure: false, // Use TLS
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    })
+  : null;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -13,19 +33,12 @@ import { AttendanceLogAttributes, StudentAttributes } from '../types/models';
 
 /**
  * Formats a Date object as "HH:MM AM/PM" (12-hour clock, leading zero for hours).
- *
- * Examples:
- *   07:45 → "07:45 AM"
- *   13:30 → "01:30 PM"
- *   00:00 → "12:00 AM"
- *   12:00 → "12:00 PM"
  */
 function formatScanTime(date: Date): string {
   let hours = date.getHours();
   const minutes = date.getMinutes();
   const period = hours >= 12 ? 'PM' : 'AM';
 
-  // Convert 24-hour to 12-hour
   if (hours === 0) {
     hours = 12;
   } else if (hours > 12) {
@@ -39,24 +52,107 @@ function formatScanTime(date: Date): string {
 }
 
 // ---------------------------------------------------------------------------
-// sendParentNotification
+// Send Email Notification
+// ---------------------------------------------------------------------------
+
+async function sendEmail(
+  student: StudentAttributes,
+  log: AttendanceLogAttributes,
+  formattedTime: string
+): Promise<boolean> {
+  if (!EMAIL_ENABLED || !emailTransporter) {
+    console.log('[Email] Email notifications disabled');
+    return false;
+  }
+
+  if (!student.parent_email || !student.parent_email.includes('@')) {
+    console.warn(`[Email] Invalid parent email for student ${student.name}`);
+    return false;
+  }
+
+  try {
+    const subject = `Attendance Alert: ${student.name} ${log.status === 'IN' ? 'Checked In' : 'Checked Out'}`;
+    
+    const htmlBody = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #1e3a8a, #831843); padding: 20px; text-align: center;">
+          <h1 style="color: #f8c22e; margin: 0;">Benedicto College</h1>
+          <p style="color: white; margin: 5px 0;">RFID Attendance System</p>
+        </div>
+        
+        <div style="padding: 30px; background: #f9fafb; border: 1px solid #e5e7eb;">
+          <h2 style="color: #1f2937; margin-top: 0;">Attendance Notification</h2>
+          
+          <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+            <tr>
+              <td style="padding: 10px; background: white; border: 1px solid #e5e7eb; font-weight: bold;">Student:</td>
+              <td style="padding: 10px; background: white; border: 1px solid #e5e7eb;">${student.name}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px; background: white; border: 1px solid #e5e7eb; font-weight: bold;">Status:</td>
+              <td style="padding: 10px; background: white; border: 1px solid #e5e7eb;">
+                <span style="background: ${log.status === 'IN' ? '#d1fae5' : '#fee2e2'}; color: ${log.status === 'IN' ? '#065f46' : '#991b1b'}; padding: 4px 12px; border-radius: 4px; font-weight: bold;">
+                  ${log.status === 'IN' ? '✓ CHECKED IN' : '← CHECKED OUT'}
+                </span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 10px; background: white; border: 1px solid #e5e7eb; font-weight: bold;">Time:</td>
+              <td style="padding: 10px; background: white; border: 1px solid #e5e7eb;">${formattedTime}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px; background: white; border: 1px solid #e5e7eb; font-weight: bold;">Date:</td>
+              <td style="padding: 10px; background: white; border: 1px solid #e5e7eb;">${new Date(log.scan_time).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</td>
+            </tr>
+          </table>
+          
+          <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
+            This is an automated message from Benedicto College RFID Attendance System.
+            <br>If you have any questions, please contact the school administration.
+          </p>
+        </div>
+        
+        <div style="background: #1f2937; padding: 15px; text-align: center; color: #9ca3af; font-size: 12px;">
+          <p style="margin: 0;">© ${new Date().getFullYear()} Benedicto College. All rights reserved.</p>
+        </div>
+      </div>
+    `;
+
+    const textBody = 
+      `Benedicto College - Attendance Notification\n\n` +
+      `Student: ${student.name}\n` +
+      `Status: ${log.status === 'IN' ? 'CHECKED IN' : 'CHECKED OUT'}\n` +
+      `Time: ${formattedTime}\n` +
+      `Date: ${new Date(log.scan_time).toDateString()}\n\n` +
+      `This is an automated message from the RFID Attendance System.`;
+
+    await emailTransporter.sendMail({
+      from: process.env.SMTP_FROM || `"Benedicto College" <${process.env.SMTP_USER}>`,
+      to: student.parent_email,
+      subject,
+      text: textBody,
+      html: htmlBody,
+    });
+
+    console.log(`[Email] ✓ Sent to ${student.parent_email} for ${student.name}`);
+    return true;
+  } catch (error) {
+    console.error(`[Email] ✗ Failed to send to ${student.parent_email}:`, error);
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Main: sendParentNotification
 // ---------------------------------------------------------------------------
 
 /**
- * Sends a notification to the student's parent/guardian after an attendance scan.
+ * Sends an email notification to the student's parent/guardian after an attendance scan.
  *
- * In development mode (NODE_ENV === 'development'), the formatted message is
- * printed to console.log. In all environments, any internal error is caught
- * and logged to console.error without re-throwing (fire-and-forget safe).
+ * All errors are caught and logged — this function NEVER throws.
  *
  * @param student - The student who scanned in or out
  * @param log     - The attendance log record that was just created
- *
- * Postconditions (Requirements 3.1, 3.2, 3.3):
- *   - Message includes: student name, status, scan time (HH:MM AM/PM),
- *     parent_name, parent_email, parent_phone
- *   - In development, message is output via console.log
- *   - Any internal error is caught and logged; this function NEVER re-throws
  */
 export async function sendParentNotification(
   student: StudentAttributes,
@@ -65,45 +161,18 @@ export async function sendParentNotification(
   try {
     const formattedTime = formatScanTime(log.scan_time);
 
-    const message =
-      `Attendance Notification\n` +
-      `------------------------\n` +
-      `Student   : ${student.name}\n` +
-      `Status    : ${log.status}\n` +
-      `Scan Time : ${formattedTime}\n` +
-      `------------------------\n` +
-      `Parent    : ${student.parent_name}\n` +
-      `Email     : ${student.parent_email}\n` +
-      `Phone     : ${student.parent_phone}`;
+    console.log(
+      `\n[Notification] Processing for ${student.name} (${log.status} at ${formattedTime})`
+    );
 
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[NotificationService] ' + message);
+    const emailSent = await sendEmail(student, log, formattedTime);
+
+    if (emailSent) {
+      console.log(`[Notification] ✓ Email sent successfully\n`);
+    } else {
+      console.log(`[Notification] ✗ Email notification failed\n`);
     }
-
-    // -----------------------------------------------------------------------
-    // Future email integration via Nodemailer (commented out until configured)
-    // -----------------------------------------------------------------------
-    //
-    // import nodemailer from 'nodemailer';
-    //
-    // const transporter = nodemailer.createTransport({
-    //   host: process.env.SMTP_HOST,
-    //   port: Number(process.env.SMTP_PORT) || 587,
-    //   secure: false,
-    //   auth: {
-    //     user: process.env.SMTP_USER,
-    //     pass: process.env.SMTP_PASS,
-    //   },
-    // });
-    //
-    // await transporter.sendMail({
-    //   from: `"School Attendance" <${process.env.SMTP_FROM}>`,
-    //   to: student.parent_email,
-    //   subject: `Attendance Alert: ${student.name} scanned ${log.status}`,
-    //   text: message,
-    // });
-    // -----------------------------------------------------------------------
   } catch (error) {
-    console.error('[NotificationService] Failed to send parent notification:', error);
+    console.error('[Notification] Unexpected error:', error);
   }
 }
