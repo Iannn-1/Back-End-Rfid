@@ -24,6 +24,13 @@ const emailTransporter = EMAIL_ENABLED
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
       },
+      // Add connection timeout and pool settings
+      connectionTimeout: 10000, // 10 seconds
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
+      pool: true,
+      maxConnections: 5,
+      maxMessages: 100,
     })
   : null;
 
@@ -58,7 +65,8 @@ function formatScanTime(date: Date): string {
 async function sendEmail(
   student: StudentAttributes,
   log: AttendanceLogAttributes,
-  formattedTime: string
+  formattedTime: string,
+  retryCount = 0
 ): Promise<boolean> {
   if (!EMAIL_ENABLED || !emailTransporter) {
     console.log('[Email] Email notifications disabled');
@@ -136,8 +144,17 @@ async function sendEmail(
 
     console.log(`[Email] ✓ Sent to ${student.parent_email} for ${student.name}`);
     return true;
-  } catch (error) {
-    console.error(`[Email] ✗ Failed to send to ${student.parent_email}:`, error);
+  } catch (error: any) {
+    const errorMsg = error.message || error.toString();
+    console.error(`[Email] ✗ Failed to send to ${student.parent_email}: ${errorMsg}`);
+    
+    // Retry logic for connection errors
+    if (retryCount < 2 && (errorMsg.includes('timeout') || errorMsg.includes('ETIMEDOUT') || errorMsg.includes('ECONNREFUSED'))) {
+      console.log(`[Email] Retrying... (attempt ${retryCount + 1}/2)`);
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+      return sendEmail(student, log, formattedTime, retryCount + 1);
+    }
+    
     return false;
   }
 }
