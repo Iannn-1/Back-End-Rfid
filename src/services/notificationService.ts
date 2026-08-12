@@ -48,9 +48,18 @@ const emailTransporter = EMAIL_ENABLED
 
 // Log email configuration on startup
 if (EMAIL_ENABLED && emailTransporter) {
-  if (process.env.SENDGRID_API_KEY) {
+  const sendgridKey = process.env.SENDGRID_API_KEY;
+  const hasGmailConfig = !!(process.env.SMTP_HOST && process.env.SMTP_USER);
+  
+  console.log('[Email] Configuration check:');
+  console.log(`  - SENDGRID_API_KEY exists: ${!!sendgridKey}`);
+  console.log(`  - SENDGRID_API_KEY starts with SG.: ${sendgridKey?.startsWith('SG.') || false}`);
+  console.log(`  - Gmail SMTP_HOST exists: ${!!process.env.SMTP_HOST}`);
+  console.log(`  - Gmail SMTP_USER exists: ${!!process.env.SMTP_USER}`);
+  
+  if (sendgridKey) {
     console.log('[Email] ✓ Using SendGrid for production email delivery');
-  } else if (process.env.SMTP_HOST && process.env.SMTP_USER) {
+  } else if (hasGmailConfig) {
     console.log('[Email] ⚠️ Using Gmail SMTP (local development only - will not work on Railway)');
   } else {
     console.log('[Email] ✗ Email enabled but no valid configuration found');
