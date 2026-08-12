@@ -3,6 +3,7 @@
  * Sends parent/guardian email notifications when a student scans in or out.
  *
  * Requirements: 3.1, 3.2, 3.3, 3.4
+ * Updated: SendGrid support for production deployment
  */
 
 import nodemailer from 'nodemailer';
