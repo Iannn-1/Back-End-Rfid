@@ -27,6 +27,8 @@ const emailTransporter = EMAIL_ENABLED
               user: 'apikey',
               pass: process.env.SENDGRID_API_KEY,
             },
+            connectionTimeout: 10000, // 10 second timeout
+            greetingTimeout: 10000,
           }
         : {
             // Gmail (local development fallback)
@@ -37,9 +39,24 @@ const emailTransporter = EMAIL_ENABLED
               user: process.env.SMTP_USER,
               pass: process.env.SMTP_PASS,
             },
+            connectionTimeout: 10000, // 10 second timeout
+            greetingTimeout: 10000,
           }
     )
   : null;
+
+// Log email configuration on startup
+if (EMAIL_ENABLED && emailTransporter) {
+  if (process.env.SENDGRID_API_KEY) {
+    console.log('[Email] ✓ Using SendGrid for production email delivery');
+  } else if (process.env.SMTP_HOST && process.env.SMTP_USER) {
+    console.log('[Email] ⚠️ Using Gmail SMTP (local development only - will not work on Railway)');
+  } else {
+    console.log('[Email] ✗ Email enabled but no valid configuration found');
+  }
+} else {
+  console.log('[Email] Email notifications are disabled');
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -155,11 +172,20 @@ async function sendEmail(
     const errorMsg = error.message || error.toString();
     console.error(`[Email] ✗ Failed to send to ${student.parent_email}: ${errorMsg}`);
     
-    // Retry logic for transient network errors (up to 2 retries)
-    if (retryCount < 2 && (errorMsg.includes('timeout') || errorMsg.includes('ETIMEDOUT') || errorMsg.includes('ECONNREFUSED') || errorMsg.includes('ENOTFOUND'))) {
-      console.log(`[Email] Retrying... (attempt ${retryCount + 1}/2)`);
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+    // Don't retry timeout errors more than once on production to avoid long delays
+    const isTimeout = errorMsg.includes('timeout') || errorMsg.includes('ETIMEDOUT');
+    const maxRetries = isTimeout && process.env.NODE_ENV === 'production' ? 0 : 2;
+    
+    // Retry logic for transient network errors
+    if (retryCount < maxRetries && (isTimeout || errorMsg.includes('ECONNREFUSED') || errorMsg.includes('ENOTFOUND'))) {
+      console.log(`[Email] Retrying... (attempt ${retryCount + 1}/${maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
       return sendEmail(student, log, formattedTime, retryCount + 1);
+    }
+    
+    // Log helpful message for common errors
+    if (isTimeout) {
+      console.error('[Email] ⚠️ SMTP connection timeout - Gmail SMTP does not work on Railway. Please set up SendGrid (see EMAIL_SETUP_GUIDE.md)');
     }
     
     return false;
