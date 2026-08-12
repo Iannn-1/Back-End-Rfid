@@ -62,11 +62,14 @@ if (EMAIL_ENABLED) {
 // ---------------------------------------------------------------------------
 
 /**
- * Formats a Date object as "HH:MM AM/PM" (12-hour clock, leading zero for hours).
+ * Formats a Date object as "HH:MM AM/PM" in Philippine Time (UTC+8).
  */
 function formatScanTime(date: Date): string {
-  let hours = date.getHours();
-  const minutes = date.getMinutes();
+  // Convert to Philippine Time (UTC+8)
+  const phTime = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+  
+  let hours = phTime.getHours();
+  const minutes = phTime.getMinutes();
   const period = hours >= 12 ? 'PM' : 'AM';
 
   if (hours === 0) {
@@ -132,7 +135,7 @@ async function sendEmail(
           </tr>
           <tr>
             <td style="padding: 10px; background: white; border: 1px solid #e5e7eb; font-weight: bold;">Date:</td>
-            <td style="padding: 10px; background: white; border: 1px solid #e5e7eb;">${new Date(log.scan_time).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</td>
+            <td style="padding: 10px; background: white; border: 1px solid #e5e7eb;">${new Date(log.scan_time).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Manila' })}</td>
           </tr>
         </table>
         
@@ -153,7 +156,7 @@ async function sendEmail(
     `Student: ${student.name}\n` +
     `Status: ${log.status === 'IN' ? 'CHECKED IN' : 'CHECKED OUT'}\n` +
     `Time: ${formattedTime}\n` +
-    `Date: ${new Date(log.scan_time).toDateString()}\n\n` +
+    `Date: ${new Date(log.scan_time).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Manila' })}\n\n` +
     `This is an automated message from the RFID Attendance System.`;
 
   try {
