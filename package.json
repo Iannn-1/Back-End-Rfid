@@ -8,7 +8,8 @@
     "start": "node dist/server.js",
     "test": "jest",
     "seed:admin": "ts-node src/scripts/seedAdmin.ts",
-    "reset:students": "ts-node src/scripts/resetStudents.ts"
+    "reset:students": "ts-node src/scripts/resetStudents.ts",
+    "migrate:roles": "ts-node src/scripts/migrateUserRoles.ts"
   },
   "dependencies": {
     "@sendgrid/mail": "^8.1.6",
