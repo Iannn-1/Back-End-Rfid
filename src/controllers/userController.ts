@@ -10,12 +10,12 @@ import { ApiResponse, UserAttributes } from '../types/models';
  */
 export const getAllUsers = async (
   req: Request,
-  res: Response<ApiResponse<UserAttributes[]>>,
+  res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
-    // Check if user is superadmin
-    if (req.user?.role !== 'superadmin') {
+    // Check if user is authenticated and is superadmin
+    if (!req.user || req.user.role !== 'superadmin') {
       res.status(403).json({
         success: false,
         error: 'Access denied. Only superadmins can manage user accounts.',
@@ -77,8 +77,8 @@ export const createUser = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    // Check if user is superadmin
-    if (req.user?.role !== 'superadmin') {
+    // Check if user is authenticated and is superadmin
+    if (!req.user || req.user.role !== 'superadmin') {
       res.status(403).json({
         success: false,
         error: 'Access denied. Only superadmins can create user accounts.',
@@ -156,8 +156,8 @@ export const updateUser = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    // Check if user is superadmin
-    if (req.user?.role !== 'superadmin') {
+    // Check if user is authenticated and is superadmin
+    if (!req.user || req.user.role !== 'superadmin') {
       res.status(403).json({
         success: false,
         error: 'Access denied. Only superadmins can update user accounts.',
@@ -240,8 +240,8 @@ export const deleteUser = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    // Check if user is superadmin
-    if (req.user?.role !== 'superadmin') {
+    // Check if user is authenticated and is superadmin
+    if (!req.user || req.user.role !== 'superadmin') {
       res.status(403).json({
         success: false,
         error: 'Access denied. Only superadmins can delete user accounts.',
