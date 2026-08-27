@@ -12,7 +12,7 @@ export interface UserAttributes {
   name: string
   email: string
   password_hash: string
-  role: 'admin' | 'staff'
+  role: 'superadmin' | 'admin' | 'viewer'
   createdAt?: Date
   updatedAt?: Date
 }

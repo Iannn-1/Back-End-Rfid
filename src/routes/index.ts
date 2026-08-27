@@ -5,6 +5,7 @@ import authRouter from './auth'
 import studentsRouter from './students'
 import parentsRouter from './parents'
 import reportsRouter from './reports'
+import usersRouter from './users'
 
 /**
  * Root API router
@@ -17,5 +18,6 @@ router.use('/api/v1/dashboard', dashboardRouter)
 router.use('/api/v1/students', studentsRouter)
 router.use('/api/v1/parents', parentsRouter)
 router.use('/api/v1/reports', reportsRouter)
+router.use('/api/v1/users', usersRouter)
 
 export default router

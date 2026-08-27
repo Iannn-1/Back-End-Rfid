@@ -10,7 +10,7 @@ class User extends Model<UserAttributes, UserCreationAttributes> implements User
   public name!: string;
   public email!: string;
   public password_hash!: string;
-  public role!: 'admin' | 'staff';
+  public role!: 'superadmin' | 'admin' | 'viewer';
 
   // Timestamps
   public readonly createdAt!: Date;
@@ -38,8 +38,9 @@ User.init(
       allowNull: false,
     },
     role: {
-      type: DataTypes.ENUM('admin', 'staff'),
+      type: DataTypes.ENUM('superadmin', 'admin', 'viewer'),
       allowNull: false,
+      defaultValue: 'viewer',
     },
   },
   {
