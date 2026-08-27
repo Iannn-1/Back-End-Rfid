@@ -6,6 +6,7 @@ import { ApiResponse, UserAttributes } from '../types/models';
 /**
  * Get all users (admin accounts)
  * GET /api/v1/users
+ * Only superadmins can access this
  */
 export const getAllUsers = async (
   req: Request,
@@ -13,6 +14,15 @@ export const getAllUsers = async (
   next: NextFunction
 ): Promise<void> => {
   try {
+    // Check if user is superadmin
+    if (req.user?.role !== 'superadmin') {
+      res.status(403).json({
+        success: false,
+        error: 'Access denied. Only superadmins can manage user accounts.',
+      });
+      return;
+    }
+
     const users = await User.findAll({
       order: [['createdAt', 'DESC']],
     });
@@ -59,6 +69,7 @@ export const getUserById = async (
 /**
  * Create a new user (admin account)
  * POST /api/v1/users
+ * Only superadmins can access this
  */
 export const createUser = async (
   req: Request,
@@ -66,6 +77,15 @@ export const createUser = async (
   next: NextFunction
 ): Promise<void> => {
   try {
+    // Check if user is superadmin
+    if (req.user?.role !== 'superadmin') {
+      res.status(403).json({
+        success: false,
+        error: 'Access denied. Only superadmins can create user accounts.',
+      });
+      return;
+    }
+
     const { name, email, password, role } = req.body;
 
     // Validation
@@ -128,6 +148,7 @@ export const createUser = async (
 /**
  * Update a user
  * PATCH /api/v1/users/:id
+ * Only superadmins can access this
  */
 export const updateUser = async (
   req: Request,
@@ -135,6 +156,15 @@ export const updateUser = async (
   next: NextFunction
 ): Promise<void> => {
   try {
+    // Check if user is superadmin
+    if (req.user?.role !== 'superadmin') {
+      res.status(403).json({
+        success: false,
+        error: 'Access denied. Only superadmins can update user accounts.',
+      });
+      return;
+    }
+
     const { id } = req.params;
     const { name, email, password, role } = req.body;
 
@@ -202,6 +232,7 @@ export const updateUser = async (
 /**
  * Delete a user
  * DELETE /api/v1/users/:id
+ * Only superadmins can access this
  */
 export const deleteUser = async (
   req: Request,
@@ -209,6 +240,15 @@ export const deleteUser = async (
   next: NextFunction
 ): Promise<void> => {
   try {
+    // Check if user is superadmin
+    if (req.user?.role !== 'superadmin') {
+      res.status(403).json({
+        success: false,
+        error: 'Access denied. Only superadmins can delete user accounts.',
+      });
+      return;
+    }
+
     const { id } = req.params;
 
     const user = await User.findByPk(id);
