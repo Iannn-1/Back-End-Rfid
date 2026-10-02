@@ -5,7 +5,9 @@ import { uploadPhoto } from '../utils/uploadPhoto';
 
 interface StudentBody {
   rfid_tag_uid: string;
-  name: string;
+  first_name: string;
+  last_name: string;
+  middle_name?: string;
   email?: string;
   student_level: 'Elementary' | 'Junior High School' | 'Senior High School' | 'College';
   grade_level: string;
@@ -61,7 +63,9 @@ export async function createStudent(
   try {
     const {
       rfid_tag_uid,
-      name,
+      first_name,
+      last_name,
+      middle_name,
       email,
       student_level,
       grade_level,
@@ -77,7 +81,7 @@ export async function createStudent(
 
     // Required field validation
     const requiredFields: (keyof StudentBody)[] = [
-      'rfid_tag_uid', 'name', 'student_level', 'grade_level',
+      'rfid_tag_uid', 'first_name', 'last_name', 'student_level', 'grade_level',
       'section', 'parent_name', 'parent_email', 'parent_phone',
     ];
     const missing = requiredFields.filter(
@@ -109,7 +113,9 @@ export async function createStudent(
 
     const student = await Student.create({
       rfid_tag_uid,
-      name,
+      first_name,
+      last_name,
+      middle_name,
       email,
       student_level,
       grade_level,
@@ -155,7 +161,7 @@ export async function listStudents(
     if (req.query.student_level) where.student_level = req.query.student_level as string;
     if (req.query.status) where.status = req.query.status as string;
 
-    const students = await Student.findAll({ where, order: [['name', 'ASC']] });
+    const students = await Student.findAll({ where, order: [['last_name', 'ASC'], ['first_name', 'ASC']] });
     res.status(200).json({ success: true, data: students });
   } catch (err) {
     next(err);

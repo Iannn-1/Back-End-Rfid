@@ -100,11 +100,12 @@ async function sendEmail(
   }
 
   if (!student.parent_email || !student.parent_email.includes('@')) {
-    console.warn(`[Email] Invalid parent email for student ${student.name}`);
+    console.warn(`[Email] Invalid parent email for student ${student.first_name} ${student.last_name}`);
     return false;
   }
 
-  const subject = `Attendance Alert: ${student.name} ${log.status === 'IN' ? 'Checked In' : 'Checked Out'}`;
+  const fullName = `${student.first_name} ${student.middle_name ? student.middle_name + ' ' : ''}${student.last_name}`;
+  const subject = `Attendance Alert: ${fullName} ${log.status === 'IN' ? 'Checked In' : 'Checked Out'}`;
   
   const htmlBody = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -119,7 +120,7 @@ async function sendEmail(
         <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
           <tr>
             <td style="padding: 10px; background: white; border: 1px solid #e5e7eb; font-weight: bold;">Student:</td>
-            <td style="padding: 10px; background: white; border: 1px solid #e5e7eb;">${student.name}</td>
+            <td style="padding: 10px; background: white; border: 1px solid #e5e7eb;">${fullName}</td>
           </tr>
           <tr>
             <td style="padding: 10px; background: white; border: 1px solid #e5e7eb; font-weight: bold;">Status:</td>
@@ -153,7 +154,7 @@ async function sendEmail(
 
   const textBody = 
     `Benedicto College - Attendance Notification\n\n` +
-    `Student: ${student.name}\n` +
+    `Student: ${fullName}\n` +
     `Status: ${log.status === 'IN' ? 'CHECKED IN' : 'CHECKED OUT'}\n` +
     `Time: ${formattedTime}\n` +
     `Date: ${new Date(log.scan_time).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Manila' })}\n\n` +
@@ -172,7 +173,7 @@ async function sendEmail(
         html: htmlBody,
       });
       
-      console.log(`[Email] ✓ Sent to ${student.parent_email} for ${student.name}`);
+      console.log(`[Email] ✓ Sent to ${student.parent_email} for ${fullName}`);
       return true;
     } else if (gmailTransporter) {
       // Use Gmail SMTP (local development only)
@@ -186,7 +187,7 @@ async function sendEmail(
         html: htmlBody,
       });
       
-      console.log(`[Email] ✓ Sent to ${student.parent_email} for ${student.name}`);
+      console.log(`[Email] ✓ Sent to ${student.parent_email} for ${fullName}`);
       return true;
     } else {
       console.error('[Email] No email transporter configured');
@@ -231,7 +232,7 @@ export async function sendParentNotification(
     const formattedTime = formatScanTime(log.scan_time);
 
     console.log(
-      `\n[Notification] Processing for ${student.name} (${log.status} at ${formattedTime})`
+      `\n[Notification] Processing for ${student.first_name} ${student.last_name} (${log.status} at ${formattedTime})`
     );
 
     const emailSent = await sendEmail(student, log, formattedTime);

@@ -20,7 +20,9 @@ export interface UserAttributes {
 export interface StudentAttributes {
   id: number
   rfid_tag_uid: string
-  name: string
+  first_name: string
+  last_name: string
+  middle_name?: string
   email?: string
   student_level: 'Elementary' | 'Junior High School' | 'Senior High School' | 'College'
   grade_level: string

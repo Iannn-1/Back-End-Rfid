@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Database Migration Helper</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    
+    .container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 600px;
+      width: 100%;
+      padding: 40px;
+    }
+    
+    h1 {
+      color: #1f2937;
+      font-size: 28px;
+      margin-bottom: 8px;
+    }
+    
+    .subtitle {
+      color: #6b7280;
+      font-size: 14px;
+      margin-bottom: 32px;
+    }
+    
+    .input-group {
+      margin-bottom: 20px;
+    }
+    
+    label {
+      display: block;
+      color: #374151;
+      font-weight: 600;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    
+    input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: border-color 0.2s;
+    }
+    
+    input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    
+    .button-group {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+    
+    button {
+      flex: 1;
+      padding: 14px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .btn-check {
+      background: #e0e7ff;
+      color: #4338ca;
+    }
+    
+    .btn-check:hover:not(:disabled) {
+      background: #c7d2fe;
+    }
+    
+    .btn-migrate {
+      background: #667eea;
+      color: white;
+    }
+    
+    .btn-migrate:hover:not(:disabled) {
+      background: #5568d3;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    
+    .status {
+      margin-top: 24px;
+      padding: 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    
+    .status.pending {
+      background: #fef3c7;
+      color: #92400e;
+      border: 2px solid #fbbf24;
+    }
+    
+    .status.completed {
+      background: #d1fae5;
+      color: #065f46;
+      border: 2px solid #10b981;
+    }
+    
+    .status.error {
+      background: #fee2e2;
+      color: #991b1b;
+      border: 2px solid #ef4444;
+    }
+    
+    .status.loading {
+      background: #e0e7ff;
+      color: #4338ca;
+      border: 2px solid #818cf8;
+    }
+    
+    .log {
+      margin-top: 16px;
+      padding: 16px;
+      background: #f9fafb;
+      border-radius: 8px;
+      max-height: 300px;
+      overflow-y: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    
+    .warning {
+      background: #fef3c7;
+      border: 2px solid #fbbf24;
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+      font-size: 14px;
+      color: #92400e;
+    }
+    
+    .warning strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔄 Database Migration Helper</h1>
+    <p class="subtitle">Student Name Field Migration Tool</p>
+    
+    <div class="warning">
+      <strong>⚠️ Important:</strong>
+      This will modify your production database. Make sure you have a backup before proceeding!
+    </div>
+    
+    <div class="input-group">
+      <label for="apiUrl">Backend API URL</label>
+      <input 
+        type="text" 
+        id="apiUrl" 
+        placeholder="https://your-app.railway.app"
+        value="http://localhost:5000"
+      >
+    </div>
+    
+    <div class="input-group">
+      <label for="apiKey">API Key (Optional - if required)</label>
+      <input 
+        type="password" 
+        id="apiKey" 
+        placeholder="Leave empty if not needed"
+      >
+    </div>
+    
+    <div class="button-group">
+      <button class="btn-check" onclick="checkStatus()">
+        📊 Check Status
+      </button>
+      <button class="btn-migrate" onclick="runMigration()">
+        🚀 Run Migration
+      </button>
+    </div>
+    
+    <div id="status" style="display: none;"></div>
+    <div id="log" class="log" style="display: none;"></div>
+  </div>
+
+  <script>
+    const statusDiv = document.getElementById('status');
+    const logDiv = document.getElementById('log');
+    
+    function getApiUrl() {
+      return document.getElementById('apiUrl').value.trim();
+    }
+    
+    function getHeaders() {
+      const apiKey = document.getElementById('apiKey').value.trim();
+      const headers = {
+        'Content-Type': 'application/json'
+      };
+      if (apiKey) {
+        headers['X-API-Key'] = apiKey;
+      }
+      return headers;
+    }
+    
+    function showStatus(message, type = 'loading') {
+      statusDiv.style.display = 'block';
+      statusDiv.className = `status ${type}`;
+      statusDiv.innerHTML = message;
+    }
+    
+    function showLog(content) {
+      logDiv.style.display = 'block';
+      logDiv.textContent = content;
+    }
+    
+    async function checkStatus() {
+      const apiUrl = getApiUrl();
+      if (!apiUrl) {
+        alert('Please enter your backend API URL');
+        return;
+      }
+      
+      showStatus('🔍 Checking migration status...', 'loading');
+      logDiv.style.display = 'none';
+      
+      try {
+        const response = await fetch(`${apiUrl}/api/v1/migrate/status`, {
+          method: 'GET',
+          headers: getHeaders()
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          let statusType = 'pending';
+          let icon = '⏳';
+          
+          if (data.status === 'completed') {
+            statusType = 'completed';
+            icon = '✅';
+          } else if (data.status === 'error') {
+            statusType = 'error';
+            icon = '❌';
+          }
+          
+          showStatus(
+            `${icon} <strong>Status: ${data.status.toUpperCase()}</strong><br>` +
+            data.message +
+            `<br><br><strong>Database Columns:</strong><br>` +
+            `• Old "name" column: ${data.columns.hasOldNameColumn ? '✓ Exists' : '✗ Not found'}<br>` +
+            `• New "first_name" column: ${data.columns.hasFirstNameColumn ? '✓ Exists' : '✗ Not found'}<br>` +
+            `• New "last_name" column: ${data.columns.hasLastNameColumn ? '✓ Exists' : '✗ Not found'}<br>` +
+            `• New "middle_name" column: ${data.columns.hasMiddleNameColumn ? '✓ Exists' : '✗ Not found'}`,
+            statusType
+          );
+        } else {
+          showStatus(`❌ Error: ${data.error || data.message}`, 'error');
+        }
+      } catch (error) {
+        showStatus(`❌ Connection Error: ${error.message}<br>Make sure your backend is running and accessible.`, 'error');
+      }
+    }
+    
+    async function runMigration() {
+      const apiUrl = getApiUrl();
+      if (!apiUrl) {
+        alert('Please enter your backend API URL');
+        return;
+      }
+      
+      if (!confirm('⚠️ Are you sure you want to run the migration? This will modify your database schema and data.')) {
+        return;
+      }
+      
+      showStatus('🚀 Running migration... This may take a few moments.', 'loading');
+      logDiv.style.display = 'none';
+      
+      try {
+        const response = await fetch(`${apiUrl}/api/v1/migrate/student-names`, {
+          method: 'POST',
+          headers: getHeaders()
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          if (data.alreadyMigrated) {
+            showStatus('✅ Migration already completed!', 'completed');
+          } else {
+            showStatus(
+              `✅ <strong>Migration Completed Successfully!</strong><br><br>` +
+              `<strong>Statistics:</strong><br>` +
+              `• Students migrated: ${data.stats.totalMigrated}<br>` +
+              `• Records processed: ${data.stats.studentsProcessed}<br><br>` +
+              `<strong>Changes applied:</strong><br>` +
+              data.changes.map(c => `• ${c}`).join('<br>') +
+              `<br><br>✨ You can now deploy your updated frontend!`,
+              'completed'
+            );
+            
+            if (data.migrationLog && data.migrationLog.length > 0) {
+              showLog(
+                'Migration Log:\n\n' + 
+                data.migrationLog.join('\n')
+              );
+            }
+          }
+        } else {
+          showStatus(
+            `❌ <strong>Migration Failed</strong><br><br>` +
+            `Error: ${data.error || data.message}<br><br>` +
+            (data.details ? `Details: ${data.details}` : ''),
+            'error'
+          );
+        }
+      } catch (error) {
+        showStatus(`❌ Connection Error: ${error.message}<br>Make sure your backend is running and accessible.`, 'error');
+      }
+    }
+  </script>
+</body>
+</html>

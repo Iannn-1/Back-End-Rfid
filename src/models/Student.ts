@@ -65,7 +65,9 @@ class Student
 {
   public id!: number;
   public rfid_tag_uid!: string;
-  public name!: string;
+  public first_name!: string;
+  public last_name!: string;
+  public middle_name!: string | undefined;
   public email!: string | undefined;
   public student_level!: 'Elementary' | 'Junior High School' | 'Senior High School' | 'College';
   public grade_level!: string;
@@ -94,9 +96,17 @@ Student.init(
       allowNull: false,
       unique: true,
     },
-    name: {
+    first_name: {
       type: DataTypes.STRING(255),
       allowNull: false,
+    },
+    last_name: {
+      type: DataTypes.STRING(255),
+      allowNull: false,
+    },
+    middle_name: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
     },
     email: {
       type: DataTypes.STRING(255),
