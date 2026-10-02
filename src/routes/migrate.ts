@@ -40,15 +40,32 @@ router.post('/student-names', async (req: Request, res: Response) => {
 
     console.log('📋 Found "name" column. Proceeding with migration...');
 
-    // Step 2: Add new columns if they don't exist
+    // Step 2: Check if new columns already exist before adding them
+    const existingColumns = await sequelize.query<{ COLUMN_NAME: string }>(
+      `SELECT COLUMN_NAME 
+       FROM INFORMATION_SCHEMA.COLUMNS 
+       WHERE TABLE_NAME = 'students' 
+       AND TABLE_SCHEMA = DATABASE()
+       AND COLUMN_NAME IN ('first_name', 'last_name', 'middle_name')`,
+      { type: QueryTypes.SELECT }
+    );
+
+    const hasFirstName = existingColumns.some(c => c.COLUMN_NAME === 'first_name');
+    const hasLastName = existingColumns.some(c => c.COLUMN_NAME === 'last_name');
+    const hasMiddleName = existingColumns.some(c => c.COLUMN_NAME === 'middle_name');
+
+    // Add columns only if they don't exist
     console.log('➕ Adding new columns: first_name, last_name, middle_name...');
     
-    await sequelize.query(`
-      ALTER TABLE students 
-      ADD COLUMN IF NOT EXISTS first_name VARCHAR(255) NULL AFTER rfid_tag_uid,
-      ADD COLUMN IF NOT EXISTS last_name VARCHAR(255) NULL AFTER first_name,
-      ADD COLUMN IF NOT EXISTS middle_name VARCHAR(255) NULL AFTER last_name
-    `);
+    if (!hasFirstName) {
+      await sequelize.query(`ALTER TABLE students ADD COLUMN first_name VARCHAR(255) NULL AFTER rfid_tag_uid`);
+    }
+    if (!hasLastName) {
+      await sequelize.query(`ALTER TABLE students ADD COLUMN last_name VARCHAR(255) NULL AFTER first_name`);
+    }
+    if (!hasMiddleName) {
+      await sequelize.query(`ALTER TABLE students ADD COLUMN middle_name VARCHAR(255) NULL AFTER last_name`);
+    }
 
     // Step 3: Migrate existing data
     console.log('🔄 Migrating existing student names...');
