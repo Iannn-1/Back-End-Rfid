@@ -100,11 +100,12 @@ async function sendEmail(
   }
 
   if (!student.parent_email || !student.parent_email.includes('@')) {
-    console.warn(`[Email] Invalid parent email for student ${student.first_name} ${student.last_name}`);
+    const studentName = student.name || `${student.first_name} ${student.last_name}`;
+    console.warn(`[Email] Invalid parent email for student ${studentName}`);
     return false;
   }
 
-  const fullName = `${student.first_name} ${student.middle_name ? student.middle_name + ' ' : ''}${student.last_name}`;
+  const fullName = student.name || `${student.first_name} ${student.middle_name ? student.middle_name + ' ' : ''}${student.last_name}`;
   const subject = `Attendance Alert: ${fullName} ${log.status === 'IN' ? 'Checked In' : 'Checked Out'}`;
   
   const htmlBody = `
@@ -232,7 +233,7 @@ export async function sendParentNotification(
     const formattedTime = formatScanTime(log.scan_time);
 
     console.log(
-      `\n[Notification] Processing for ${student.first_name} ${student.last_name} (${log.status} at ${formattedTime})`
+      `\n[Notification] Processing for ${student.name || `${student.first_name} ${student.last_name}`} (${log.status} at ${formattedTime})`
     );
 
     const emailSent = await sendEmail(student, log, formattedTime);

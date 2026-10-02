@@ -20,9 +20,12 @@ export interface UserAttributes {
 export interface StudentAttributes {
   id: number
   rfid_tag_uid: string
+  // New structure
   first_name: string
   last_name: string
   middle_name?: string
+  // Old structure (for backward compatibility during migration)
+  name?: string
   email?: string
   student_level: 'Elementary' | 'Junior High School' | 'Senior High School' | 'College'
   grade_level: string

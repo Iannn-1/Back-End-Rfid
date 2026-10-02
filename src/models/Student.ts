@@ -65,9 +65,11 @@ class Student
 {
   public id!: number;
   public rfid_tag_uid!: string;
+  // Support both old and new structure during migration
   public first_name!: string;
   public last_name!: string;
   public middle_name!: string | undefined;
+  public name!: string | undefined; // Keep for backward compatibility during migration
   public email!: string | undefined;
   public student_level!: 'Elementary' | 'Junior High School' | 'Senior High School' | 'College';
   public grade_level!: string;
@@ -96,13 +98,17 @@ Student.init(
       allowNull: false,
       unique: true,
     },
+    name: {
+      type: DataTypes.STRING(255),
+      allowNull: true, // Make optional during migration
+    },
     first_name: {
       type: DataTypes.STRING(255),
-      allowNull: false,
+      allowNull: true, // Make optional temporarily
     },
     last_name: {
       type: DataTypes.STRING(255),
-      allowNull: false,
+      allowNull: true, // Make optional temporarily
     },
     middle_name: {
       type: DataTypes.STRING(255),
