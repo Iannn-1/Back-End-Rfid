@@ -183,7 +183,7 @@ export async function generateReport(
 
         rows.push({
           'Student ID':  s.id,
-          'Name':        s.name,
+          'Name':        `${s.last_name}, ${s.first_name}${s.middle_name ? ' ' + s.middle_name : ''}`,
           'Level':       s.student_level,
           'Grade':       s.grade_level,
           'Section':     s.section,
@@ -202,13 +202,13 @@ export async function generateReport(
         studentWhere.status = filterStatus === 'active' ? 'Active' : 'Inactive';
       }
 
-      const students = await Student.findAll({ where: studentWhere, order: [['name', 'ASC']] });
+      const students = await Student.findAll({ where: studentWhere, order: [['last_name', 'ASC'], ['first_name', 'ASC']] });
 
       rows = students.map((s) => {
         const attrs = s.get({ plain: true }) as StudentAttributes;
         return {
           'ID':      attrs.id,
-          'Name':    attrs.name,
+          'Name':    `${attrs.last_name}, ${attrs.first_name}${attrs.middle_name ? ' ' + attrs.middle_name : ''}`,
           'Email':   attrs.email ?? '—',
           'Level':   attrs.student_level,
           'Grade':   attrs.grade_level,
@@ -224,7 +224,7 @@ export async function generateReport(
     // RFID tag inventory  (tags = one-per-student in this system)
     // -----------------------------------------------------------------------
     else if (type === 'tags') {
-      const students = await Student.findAll({ where: studentWhere, order: [['name', 'ASC']] });
+      const students = await Student.findAll({ where: studentWhere, order: [['last_name', 'ASC'], ['first_name', 'ASC']] });
 
       // Last seen: latest scan per student
       const studentIds = students.map((s) => (s.get() as StudentAttributes).id);
@@ -244,7 +244,7 @@ export async function generateReport(
         const attrs = s.get({ plain: true }) as StudentAttributes;
         return {
           'Tag UID':   attrs.rfid_tag_uid,
-          'Owner':     attrs.name,
+          'Owner':     `${attrs.last_name}, ${attrs.first_name}${attrs.middle_name ? ' ' + attrs.middle_name : ''}`,
           'Level':     attrs.student_level,
           'Status':    attrs.status === 'Active' ? 'Assigned' : 'Disabled',
           'Issued At': attrs.createdAt ? new Date(attrs.createdAt).toLocaleDateString() : '—',

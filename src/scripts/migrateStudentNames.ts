@@ -6,7 +6,7 @@
  */
 
 import { sequelize } from '../config/database';
-import Student from '../models/Student';
+import { QueryTypes } from 'sequelize';
 
 async function migrateStudentNames() {
   console.log('Starting student name migration...');
@@ -41,9 +41,10 @@ async function migrateStudentNames() {
     // Step 3: Migrate existing data
     console.log('Migrating existing student names...');
     
-    const [students] = await sequelize.query<{ id: number; name: string }>(`
-      SELECT id, name FROM students WHERE name IS NOT NULL
-    `);
+    const students = await sequelize.query<{ id: number; name: string }>(
+      `SELECT id, name FROM students WHERE name IS NOT NULL`,
+      { type: QueryTypes.SELECT }
+    );
 
     console.log(`Found ${students.length} students to migrate`);
 
