@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import { Router, Request, Response } from 'express'
 import rfidRouter from './rfid'
 import dashboardRouter from './dashboard'
 import authRouter from './auth'
@@ -12,6 +12,15 @@ import migrateRouter from './migrate'
  * Root API router
  */
 const router = Router()
+
+// Health check endpoint
+router.get('/health', (_req: Request, res: Response) => {
+  res.status(200).json({ 
+    status: 'ok',
+    message: 'Backend is running',
+    timestamp: new Date().toISOString()
+  })
+})
 
 router.use('/api/v1/auth', authRouter)
 router.use('/api/v1/rfid', rfidRouter)
