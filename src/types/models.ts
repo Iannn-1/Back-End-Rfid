@@ -20,6 +20,7 @@ export interface UserAttributes {
 export interface StudentAttributes {
   id: number
   rfid_tag_uid: string
+  school_id?: string // Format: YYYY-NNNN (e.g., 2026-8813)
   // New structure
   first_name: string
   last_name: string

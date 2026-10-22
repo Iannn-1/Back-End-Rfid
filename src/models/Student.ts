@@ -65,6 +65,7 @@ class Student
 {
   public id!: number;
   public rfid_tag_uid!: string;
+  public school_id!: string; // Format: YYYY-NNNN (e.g., 2026-8813)
   // Support both old and new structure during migration
   public first_name!: string;
   public last_name!: string;
@@ -97,6 +98,14 @@ Student.init(
       type: DataTypes.STRING(255),
       allowNull: false,
       unique: true,
+    },
+    school_id: {
+      type: DataTypes.STRING(20),
+      allowNull: true, // Make optional initially for migration
+      unique: true,
+      validate: {
+        is: /^\d{4}-\d{4}$/i, // Format: YYYY-NNNN
+      },
     },
     name: {
       type: DataTypes.STRING(255),

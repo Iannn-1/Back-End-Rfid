@@ -7,6 +7,7 @@ import parentsRouter from './parents'
 import reportsRouter from './reports'
 import usersRouter from './users'
 import migrateRouter from './migrate'
+import schoolIdMigrationRouter from './schoolIdMigration'
 
 /**
  * Root API router
@@ -31,5 +32,6 @@ router.use('/api/v1/reports', reportsRouter)
 router.use('/api/v1/users', usersRouter)
 // TEMPORARY: Remove after migration is complete
 router.use('/api/v1/migrate', migrateRouter)
+router.use('/api/v1/migrate', schoolIdMigrationRouter)
 
 export default router

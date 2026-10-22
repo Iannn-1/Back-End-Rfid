@@ -5,6 +5,7 @@ import { uploadPhoto } from '../utils/uploadPhoto';
 
 interface StudentBody {
   rfid_tag_uid: string;
+  school_id?: string; // Format: YYYY-NNNN (only last 4 digits editable)
   first_name: string;
   last_name: string;
   middle_name?: string;
@@ -52,6 +53,68 @@ function validateLevelAndGrade(body: Partial<StudentBody>): string | null {
 }
 
 /**
+ * Validates and formats school_id.
+ * Format: YYYY-NNNN where YYYY is current year and NNNN is 4 digits
+ * Returns formatted school_id or error string
+ */
+function validateSchoolId(schoolId: string | undefined): { valid: boolean; schoolId?: string; error?: string } {
+  if (!schoolId || !schoolId.trim()) {
+    return { valid: true }; // Optional field
+  }
+
+  // Extract last 4 digits and validate
+  const parts = schoolId.split('-');
+  if (parts.length !== 2) {
+    return { valid: false, error: 'School ID must be in format YYYY-NNNN' };
+  }
+
+  const [year, digits] = parts;
+  
+  // Validate 4-digit number
+  if (!/^\d{4}$/.test(digits)) {
+    return { valid: false, error: 'School ID last part must be exactly 4 digits' };
+  }
+
+  // Year should match current year
+  const currentYear = new Date().getFullYear();
+  if (year !== String(currentYear)) {
+    // Auto-correct the year to current year
+    return { valid: true, schoolId: `${currentYear}-${digits}` };
+  }
+
+  return { valid: true, schoolId: schoolId };
+}
+
+/**
+ * Generates a new school_id with current year prefix
+ * Format: YYYY-NNNN where NNNN is auto-incremented
+ */
+async function generateSchoolId(): Promise<string> {
+  const currentYear = new Date().getFullYear();
+  
+  // Find the highest school_id for current year
+  const students = await Student.findAll({
+    where: {
+      school_id: {
+        [require('sequelize').Op.like]: `${currentYear}-%`
+      }
+    },
+    order: [['school_id', 'DESC']],
+    limit: 1
+  });
+
+  let nextNumber = 1;
+  if (students.length > 0 && students[0].school_id) {
+    const lastId = students[0].school_id;
+    const lastNumber = parseInt(lastId.split('-')[1]);
+    nextNumber = lastNumber + 1;
+  }
+
+  // Format: YYYY-NNNN (padded to 4 digits)
+  return `${currentYear}-${String(nextNumber).padStart(4, '0')}`;
+}
+
+/**
  * POST /api/v1/students
  * Creates a new student record.
  */
@@ -63,6 +126,7 @@ export async function createStudent(
   try {
     const {
       rfid_tag_uid,
+      school_id,
       first_name,
       last_name,
       middle_name,
@@ -106,6 +170,27 @@ export async function createStudent(
       return;
     }
 
+    // Validate and format school_id or auto-generate
+    let finalSchoolId: string | undefined;
+    if (school_id && school_id.trim()) {
+      const validation = validateSchoolId(school_id);
+      if (!validation.valid) {
+        res.status(400).json({ success: false, error: validation.error ?? 'Invalid school ID' });
+        return;
+      }
+      finalSchoolId = validation.schoolId;
+      
+      // Check for duplicate school_id
+      const existingSchoolId = await Student.findOne({ where: { school_id: finalSchoolId } });
+      if (existingSchoolId) {
+        res.status(409).json({ success: false, error: 'School ID already in use' });
+        return;
+      }
+    } else {
+      // Auto-generate school_id
+      finalSchoolId = await generateSchoolId();
+    }
+
     // Upload profile photo to Cloudinary if it's a base64 string
     console.log('[createStudent] profile_photo received:', profile_photo ? `${profile_photo.substring(0, 50)}... (${profile_photo.length} chars)` : 'none');
     const photoUrl = profile_photo ? await uploadPhoto(profile_photo) : undefined;
@@ -113,6 +198,7 @@ export async function createStudent(
 
     const student = await Student.create({
       rfid_tag_uid,
+      school_id: finalSchoolId,
       first_name,
       last_name,
       middle_name,
@@ -140,7 +226,7 @@ export async function createStudent(
       return;
     }
     if (err.name === 'SequelizeUniqueConstraintError') {
-      res.status(409).json({ success: false, error: 'RFID tag UID already in use' });
+      res.status(409).json({ success: false, error: 'RFID tag UID or School ID already in use' });
       return;
     }
     next(err);
@@ -219,6 +305,30 @@ export async function updateStudent(
       }
     }
 
+    // Validate school_id if provided
+    if (req.body.school_id !== undefined && req.body.school_id !== student.school_id) {
+      const validation = validateSchoolId(req.body.school_id);
+      if (!validation.valid) {
+        res.status(400).json({ success: false, error: validation.error ?? 'Invalid school ID' });
+        return;
+      }
+      
+      // Check for duplicate school_id
+      if (validation.schoolId) {
+        const existingSchoolId = await Student.findOne({ 
+          where: { 
+            school_id: validation.schoolId,
+            id: { [require('sequelize').Op.ne]: req.params.id }
+          } 
+        });
+        if (existingSchoolId) {
+          res.status(409).json({ success: false, error: 'School ID already in use' });
+          return;
+        }
+        req.body.school_id = validation.schoolId;
+      }
+    }
+
     // If profile_photo is a new base64 upload, convert it to a Cloudinary URL
     if (req.body.profile_photo && req.body.profile_photo.startsWith('data:image/')) {
       const photoUrl = await uploadPhoto(req.body.profile_photo);
@@ -237,7 +347,7 @@ export async function updateStudent(
       return;
     }
     if (err.name === 'SequelizeUniqueConstraintError') {
-      res.status(409).json({ success: false, error: 'RFID tag UID already in use' });
+      res.status(409).json({ success: false, error: 'RFID tag UID or School ID already in use' });
       return;
     }
     next(err);
