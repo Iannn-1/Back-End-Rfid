@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Verification Tester - Benedicto College</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px 10px 0 0;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            color: #1e3a8a;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        .section {
+            background: white;
+            padding: 30px;
+            margin-bottom: 2px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .section:last-child {
+            border-radius: 0 0 10px 10px;
+        }
+
+        .section h2 {
+            color: #1f2937;
+            margin-bottom: 15px;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .step-number {
+            background: #1e3a8a;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        input, button {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border: 2px solid #e5e7eb;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #1e3a8a;
+        }
+
+        button {
+            background: #1e3a8a;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        button:hover {
+            background: #1e40af;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .response {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 6px;
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .response.show {
+            display: block;
+        }
+
+        .response.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 2px solid #10b981;
+        }
+
+        .response.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 2px solid #ef4444;
+        }
+
+        .response pre {
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(0,0,0,0.05);
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+
+        .note {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 12px;
+            margin: 15px 0;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #92400e;
+        }
+
+        .code-input {
+            text-align: center;
+            font-size: 24px;
+            letter-spacing: 8px;
+            font-weight: bold;
+        }
+
+        .label {
+            display: block;
+            color: #4b5563;
+            font-weight: 600;
+            margin-top: 15px;
+            margin-bottom: 5px;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .api-url {
+            background: #f3f4f6;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: #1f2937;
+            margin: 10px 0;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎓 Email Verification Tester</h1>
+            <p>Benedicto College - Parent Portal</p>
+            <div class="api-url" id="apiUrl">API: http://localhost:3001</div>
+        </div>
+
+        <!-- Step 1: Register -->
+        <div class="section">
+            <h2><span class="step-number">1</span> Register Parent Account</h2>
+            <div class="note">
+                ⚠️ Make sure you have a valid RFID tag UID from the students table!
+            </div>
+            
+            <label class="label">Name</label>
+            <input type="text" id="regName" placeholder="e.g., John Doe" value="Test Parent">
+            
+            <label class="label">Email</label>
+            <input type="email" id="regEmail" placeholder="e.g., test@gmail.com" value="">
+            
+            <label class="label">Password</label>
+            <input type="password" id="regPassword" placeholder="Min 6 characters" value="password123">
+            
+            <label class="label">Phone (Optional)</label>
+            <input type="text" id="regPhone" placeholder="e.g., 09123456789" value="09123456789">
+            
+            <label class="label">RFID Tag UID (Must exist in students table)</label>
+            <input type="text" id="regRfid" placeholder="e.g., ABC123DEF456" value="">
+            
+            <button onclick="register()">Register Account</button>
+            
+            <div id="regResponse" class="response"></div>
+        </div>
+
+        <!-- Step 2: Verify Email -->
+        <div class="section">
+            <h2><span class="step-number">2</span> Verify Email</h2>
+            <div class="note">
+                📧 Check your email inbox for the 6-digit verification code
+            </div>
+            
+            <label class="label">Email</label>
+            <input type="email" id="verifyEmail" placeholder="e.g., test@gmail.com">
+            
+            <label class="label">Verification Code</label>
+            <input type="text" id="verifyCode" class="code-input" placeholder="000000" maxlength="6">
+            
+            <button onclick="verifyEmail()">Verify Email</button>
+            <button onclick="resendCode()" style="background: #6b7280; margin-top: 5px;">Resend Code</button>
+            
+            <div id="verifyResponse" class="response"></div>
+        </div>
+
+        <!-- Step 3: Login -->
+        <div class="section">
+            <h2><span class="step-number">3</span> Login</h2>
+            <div class="note">
+                🔒 Login only works after email verification
+            </div>
+            
+            <label class="label">Email</label>
+            <input type="email" id="loginEmail" placeholder="e.g., test@gmail.com">
+            
+            <label class="label">Password</label>
+            <input type="password" id="loginPassword" placeholder="Your password">
+            
+            <button onclick="login()">Login</button>
+            
+            <div id="loginResponse" class="response"></div>
+        </div>
+    </div>
+
+    <script>
+        // Get API URL from query parameter or use default
+        const urlParams = new URLSearchParams(window.location.search);
+        const API_BASE = urlParams.get('api') || 'http://localhost:3001';
+        document.getElementById('apiUrl').textContent = `API: ${API_BASE}`;
+
+        function showResponse(elementId, success, message, data = null) {
+            const element = document.getElementById(elementId);
+            element.className = `response show ${success ? 'success' : 'error'}`;
+            element.innerHTML = `
+                <strong>${success ? '✅ Success' : '❌ Error'}</strong>
+                <div>${message}</div>
+                ${data ? `<pre>${JSON.stringify(data, null, 2)}</pre>` : ''}
+            `;
+        }
+
+        async function register() {
+            const button = event.target;
+            button.disabled = true;
+            button.textContent = 'Registering...';
+
+            const data = {
+                name: document.getElementById('regName').value,
+                email: document.getElementById('regEmail').value,
+                password: document.getElementById('regPassword').value,
+                phone: document.getElementById('regPhone').value,
+                rfid_tag_uid: document.getElementById('regRfid').value
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/api/parents/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showResponse('regResponse', true, result.message || 'Registration successful! Check your email for the verification code.', result.data);
+                    
+                    // Auto-fill email in other forms
+                    document.getElementById('verifyEmail').value = data.email;
+                    document.getElementById('loginEmail').value = data.email;
+                } else {
+                    showResponse('regResponse', false, result.error || 'Registration failed', result);
+                }
+            } catch (error) {
+                showResponse('regResponse', false, `Network error: ${error.message}`);
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Register Account';
+            }
+        }
+
+        async function verifyEmail() {
+            const button = event.target;
+            button.disabled = true;
+            button.textContent = 'Verifying...';
+
+            const data = {
+                email: document.getElementById('verifyEmail').value,
+                code: document.getElementById('verifyCode').value
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/api/parents/verify-email`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showResponse('verifyResponse', true, result.message || 'Email verified successfully!', result);
+                    
+                    // Clear code input
+                    document.getElementById('verifyCode').value = '';
+                } else {
+                    showResponse('verifyResponse', false, result.error || 'Verification failed', result);
+                }
+            } catch (error) {
+                showResponse('verifyResponse', false, `Network error: ${error.message}`);
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Verify Email';
+            }
+        }
+
+        async function resendCode() {
+            const button = event.target;
+            button.disabled = true;
+            button.textContent = 'Sending...';
+
+            const data = {
+                email: document.getElementById('verifyEmail').value
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/api/parents/resend-verification`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showResponse('verifyResponse', true, result.message || 'New code sent! Check your email.', result);
+                } else {
+                    showResponse('verifyResponse', false, result.error || 'Failed to resend code', result);
+                }
+            } catch (error) {
+                showResponse('verifyResponse', false, `Network error: ${error.message}`);
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Resend Code';
+            }
+        }
+
+        async function login() {
+            const button = event.target;
+            button.disabled = true;
+            button.textContent = 'Logging in...';
+
+            const data = {
+                email: document.getElementById('loginEmail').value,
+                password: document.getElementById('loginPassword').value
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/api/parents/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showResponse('loginResponse', true, 'Login successful!', result.data);
+                } else {
+                    if (result.code === 'EMAIL_NOT_VERIFIED') {
+                        showResponse('loginResponse', false, '⚠️ ' + result.error + ' Please verify your email in Step 2 first.', result);
+                    } else {
+                        showResponse('loginResponse', false, result.error || 'Login failed', result);
+                    }
+                }
+            } catch (error) {
+                showResponse('loginResponse', false, `Network error: ${error.message}`);
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Login';
+            }
+        }
+
+        // Allow only numbers in verification code
+        document.getElementById('verifyCode').addEventListener('input', function(e) {
+            this.value = this.value.replace(/\D/g, '').slice(0, 6);
+        });
+    </script>
+</body>
+</html>

@@ -10,7 +10,8 @@
     "seed:admin": "ts-node src/scripts/seedAdmin.ts",
     "reset:students": "ts-node src/scripts/resetStudents.ts",
     "migrate:roles": "ts-node src/scripts/migrateUserRoles.ts",
-    "migrate:schoolid": "ts-node src/scripts/addSchoolIdColumn.ts"
+    "migrate:schoolid": "ts-node src/scripts/addSchoolIdColumn.ts",
+    "migrate:emailverification": "ts-node src/scripts/addEmailVerification.ts"
   },
   "dependencies": {
     "@sendgrid/mail": "^8.1.6",

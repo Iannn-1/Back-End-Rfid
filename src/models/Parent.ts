@@ -8,11 +8,14 @@ export interface ParentAttributes {
   password_hash: string;
   phone?: string;
   rfid_tag_uid: string; // links to students.rfid_tag_uid
+  email_verified: boolean;
+  verification_code?: string;
+  verification_code_expires?: Date;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-type ParentCreationAttributes = Optional<ParentAttributes, 'id' | 'phone' | 'createdAt' | 'updatedAt'>;
+type ParentCreationAttributes = Optional<ParentAttributes, 'id' | 'phone' | 'email_verified' | 'verification_code' | 'verification_code_expires' | 'createdAt' | 'updatedAt'>;
 
 class Parent extends Model<ParentAttributes, ParentCreationAttributes> implements ParentAttributes {
   public id!: number;
@@ -21,6 +24,9 @@ class Parent extends Model<ParentAttributes, ParentCreationAttributes> implement
   public password_hash!: string;
   public phone!: string | undefined;
   public rfid_tag_uid!: string;
+  public email_verified!: boolean;
+  public verification_code!: string | undefined;
+  public verification_code_expires!: Date | undefined;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
@@ -33,6 +39,9 @@ Parent.init(
     password_hash: { type: DataTypes.STRING(255), allowNull: false },
     phone: { type: DataTypes.STRING(50), allowNull: true },
     rfid_tag_uid: { type: DataTypes.STRING(255), allowNull: false },
+    email_verified: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+    verification_code: { type: DataTypes.STRING(10), allowNull: true },
+    verification_code_expires: { type: DataTypes.DATE, allowNull: true },
   },
   { sequelize, tableName: 'parents', modelName: 'Parent' }
 );
