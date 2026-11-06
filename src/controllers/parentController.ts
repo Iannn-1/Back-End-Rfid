@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { Op } from 'sequelize';
 import { Parent, Student, AttendanceLog } from '../models/index';
 import { ApiResponse, ApiErrorResponse } from '../types/models';
-import { generateVerificationCode, sendVerificationEmail } from '../services/emailVerificationService';
+import { generateVerificationCode, sendVerificationEmail, sendPasswordResetEmail } from '../services/emailVerificationService';
 
 // ─── Register ───────────────────────────────────────────────────────────────
 
@@ -268,6 +268,151 @@ export async function resendVerificationCode(req: Request, res: Response, next: 
     res.status(200).json({
       success: true,
       message: 'Verification code sent! Please check your email.',
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+
+// ─── Forgot Password: Request Reset Code ────────────────────────────────────
+
+export async function requestPasswordReset(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      res.status(400).json({ success: false, error: 'Email is required' });
+      return;
+    }
+
+    const parent = await (Parent as any).unscoped().findOne({ where: { email } });
+    if (!parent) {
+      // Don't reveal whether email exists for security
+      res.status(200).json({
+        success: true,
+        message: 'If an account exists with this email, a password reset code has been sent.',
+      });
+      return;
+    }
+
+    // Generate reset code
+    const resetCode = generateVerificationCode();
+    const resetExpires = new Date();
+    resetExpires.setMinutes(resetExpires.getMinutes() + 15);
+
+    parent.reset_password_code = resetCode;
+    parent.reset_password_code_expires = resetExpires;
+    await parent.save();
+
+    // Send reset email
+    const emailSent = await sendPasswordResetEmail(parent.email, parent.name, resetCode);
+
+    if (!emailSent) {
+      console.warn('[RequestPasswordReset] Failed to send email, but code was generated');
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'If an account exists with this email, a password reset code has been sent.',
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Verify Reset Code ──────────────────────────────────────────────────────
+
+export async function verifyResetCode(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { email, code } = req.body;
+
+    if (!email || !code) {
+      res.status(400).json({ success: false, error: 'Email and code are required' });
+      return;
+    }
+
+    const parent = await (Parent as any).unscoped().findOne({ where: { email } });
+    if (!parent) {
+      res.status(404).json({ success: false, error: 'Invalid email or code' });
+      return;
+    }
+
+    // Check if code matches
+    if (parent.reset_password_code !== code) {
+      res.status(400).json({ success: false, error: 'Invalid reset code' });
+      return;
+    }
+
+    // Check if code expired
+    if (!parent.reset_password_code_expires || new Date() > parent.reset_password_code_expires) {
+      res.status(400).json({
+        success: false,
+        error: 'Reset code has expired. Please request a new one.',
+        code: 'CODE_EXPIRED',
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Reset code verified. You can now reset your password.',
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Reset Password ─────────────────────────────────────────────────────────
+
+export async function resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { email, code, newPassword } = req.body;
+
+    if (!email || !code || !newPassword) {
+      res.status(400).json({ success: false, error: 'Email, code, and new password are required' });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      res.status(400).json({ success: false, error: 'Password must be at least 6 characters' });
+      return;
+    }
+
+    const parent = await (Parent as any).unscoped().findOne({ where: { email } });
+    if (!parent) {
+      res.status(404).json({ success: false, error: 'Invalid email or code' });
+      return;
+    }
+
+    // Check if code matches
+    if (parent.reset_password_code !== code) {
+      res.status(400).json({ success: false, error: 'Invalid reset code' });
+      return;
+    }
+
+    // Check if code expired
+    if (!parent.reset_password_code_expires || new Date() > parent.reset_password_code_expires) {
+      res.status(400).json({
+        success: false,
+        error: 'Reset code has expired. Please request a new one.',
+        code: 'CODE_EXPIRED',
+      });
+      return;
+    }
+
+    // Hash new password
+    const password_hash = await bcrypt.hash(newPassword, 12);
+
+    // Update password and clear reset code
+    parent.password_hash = password_hash;
+    parent.reset_password_code = null;
+    parent.reset_password_code_expires = null;
+    await parent.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successfully! You can now login with your new password.',
     });
   } catch (err) {
     next(err);
