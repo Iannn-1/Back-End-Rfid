@@ -526,6 +526,7 @@ export async function resetPassword(req: Request, res: Response, next: NextFunct
 export async function getAllChildren(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const parentId = (req as any).parent.id;
+    const parentRfid = (req as any).parent.rfid_tag_uid;
 
     // Get all children for this parent
     const parentStudents = await ParentStudent.findAll({
@@ -533,7 +534,26 @@ export async function getAllChildren(req: Request, res: Response, next: NextFunc
       order: [['is_primary', 'DESC'], ['createdAt', 'ASC']],
     });
 
+    // BACKWARD COMPATIBILITY: If no entries in parent_students, use old method
     if (parentStudents.length === 0) {
+      console.log(`[getAllChildren] Parent ${parentId} has no entries in parent_students, using fallback`);
+      
+      // Use the rfid_tag_uid from parent record (old method)
+      const student = await Student.findOne({ where: { rfid_tag_uid: parentRfid } });
+      if (student) {
+        res.status(200).json({
+          success: true,
+          data: { 
+            children: [{
+              ...student.toJSON(),
+              is_primary: true,
+            }]
+          },
+        });
+        return;
+      }
+      
+      // No student found at all
       res.status(200).json({
         success: true,
         data: { children: [] },
