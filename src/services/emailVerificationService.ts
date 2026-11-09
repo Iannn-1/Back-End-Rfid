@@ -254,3 +254,162 @@ export async function sendPasswordResetEmail(
     return false;
   }
 }
+
+
+/**
+ * Sends a welcome email to parents when their child is added to the system
+ * Contains RFID tag information and registration link
+ */
+export async function sendStudentWelcomeEmail(
+  parentEmail: string,
+  parentName: string,
+  studentName: string,
+  rfidTag: string,
+  registrationUrl: string
+): Promise<boolean> {
+  if (!EMAIL_ENABLED) {
+    console.log('[StudentWelcome] Email notifications disabled');
+    return false;
+  }
+
+  if (!parentEmail || !parentEmail.includes('@')) {
+    console.warn('[StudentWelcome] Invalid email address provided');
+    return false;
+  }
+
+  const subject = 'Welcome to Benedicto College Parent Portal - Student Registered';
+  
+  const htmlBody = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: linear-gradient(135deg, #1e3a8a, #831843); padding: 20px; text-align: center;">
+        <h1 style="color: #f8c22e; margin: 0;">Benedicto College</h1>
+        <p style="color: white; margin: 5px 0;">RFID Attendance System</p>
+      </div>
+      
+      <div style="padding: 30px; background: #f9fafb; border: 1px solid #e5e7eb;">
+        <h2 style="color: #1f2937; margin-top: 0;">Welcome, ${parentName}!</h2>
+        
+        <p style="color: #4b5563; font-size: 16px; line-height: 1.6;">
+          Your child <strong style="color: #1e3a8a;">${studentName}</strong> has been successfully registered 
+          in our RFID Attendance Monitoring System.
+        </p>
+        
+        <div style="background: white; border: 2px solid #10b981; border-radius: 8px; padding: 20px; margin: 30px 0;">
+          <h3 style="color: #1f2937; margin-top: 0; font-size: 18px;">📇 Student RFID Information</h3>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 10px 0; color: #6b7280; font-size: 14px;">Student Name:</td>
+              <td style="padding: 10px 0; color: #1f2937; font-weight: 600; text-align: right;">${studentName}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 0; color: #6b7280; font-size: 14px;">RFID Tag ID:</td>
+              <td style="padding: 10px 0; color: #1e3a8a; font-weight: 700; text-align: right; font-family: monospace; font-size: 16px;">${rfidTag}</td>
+            </tr>
+          </table>
+        </div>
+        
+        <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 4px;">
+          <p style="color: #92400e; margin: 0; font-size: 14px; line-height: 1.6;">
+            <strong>📋 Important:</strong> Please keep this RFID Tag ID safe. You'll need it to register for the Parent Portal 
+            and monitor your child's attendance.
+          </p>
+        </div>
+        
+        <h3 style="color: #1f2937; margin-top: 30px; font-size: 18px;">🔐 Create Your Parent Account</h3>
+        <p style="color: #4b5563; font-size: 14px; line-height: 1.6;">
+          To monitor your child's attendance in real-time, create your parent account now:
+        </p>
+        
+        <div style="text-align: center; margin: 25px 0;">
+          <a href="${registrationUrl}?rfid=${encodeURIComponent(rfidTag)}&email=${encodeURIComponent(parentEmail)}" 
+             style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #10b981, #059669); 
+                    color: white; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 15px;
+                    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">
+            Register Now →
+          </a>
+        </div>
+        
+        <div style="background: #e0f2fe; border: 1px solid #0ea5e9; border-radius: 8px; padding: 15px; margin: 20px 0;">
+          <h4 style="color: #0c4a6e; margin: 0 0 10px 0; font-size: 15px;">✨ With your Parent Account, you can:</h4>
+          <ul style="color: #0c4a6e; margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.8;">
+            <li>View real-time attendance updates</li>
+            <li>Receive instant notifications when your child checks in/out</li>
+            <li>Access attendance history and reports</li>
+            <li>Monitor your child's school attendance patterns</li>
+          </ul>
+        </div>
+        
+        <p style="color: #6b7280; font-size: 13px; margin-top: 30px; line-height: 1.6;">
+          <strong>Need Help?</strong><br>
+          If you have any questions or need assistance, please contact the school administration.
+        </p>
+        
+        <p style="color: #9ca3af; font-size: 12px; margin-top: 20px;">
+          This is an automated message from Benedicto College RFID Attendance System.
+        </p>
+      </div>
+      
+      <div style="background: #1f2937; padding: 15px; text-align: center; color: #9ca3af; font-size: 12px;">
+        <p style="margin: 0;">© ${new Date().getFullYear()} Benedicto College. All rights reserved.</p>
+      </div>
+    </div>
+  `;
+
+  const textBody = 
+    `Benedicto College - Student Registration Confirmation\n\n` +
+    `Welcome, ${parentName}!\n\n` +
+    `Your child ${studentName} has been successfully registered in our RFID Attendance Monitoring System.\n\n` +
+    `STUDENT RFID INFORMATION\n` +
+    `========================\n` +
+    `Student Name: ${studentName}\n` +
+    `RFID Tag ID: ${rfidTag}\n\n` +
+    `IMPORTANT: Please keep this RFID Tag ID safe. You'll need it to register for the Parent Portal.\n\n` +
+    `CREATE YOUR PARENT ACCOUNT\n` +
+    `==========================\n` +
+    `To monitor your child's attendance in real-time, register here:\n` +
+    `${registrationUrl}?rfid=${encodeURIComponent(rfidTag)}&email=${encodeURIComponent(parentEmail)}\n\n` +
+    `With your Parent Account, you can:\n` +
+    `- View real-time attendance updates\n` +
+    `- Receive instant notifications\n` +
+    `- Access attendance history\n` +
+    `- Monitor attendance patterns\n\n` +
+    `Need Help? Contact the school administration.\n\n` +
+    `This is an automated message from Benedicto College RFID Attendance System.`;
+
+  try {
+    if (USE_SENDGRID_API) {
+      console.log(`[StudentWelcome] Sending via SendGrid Web API to ${parentEmail}`);
+      
+      await sgMail.send({
+        to: parentEmail,
+        from: process.env.SMTP_FROM || 'noreply@school.com',
+        subject,
+        text: textBody,
+        html: htmlBody,
+      });
+      
+      console.log(`[StudentWelcome] ✓ Welcome email sent to ${parentEmail} for student ${studentName}`);
+      return true;
+    } else if (gmailTransporter) {
+      console.log(`[StudentWelcome] Sending via Gmail SMTP to ${parentEmail}`);
+      
+      await gmailTransporter.sendMail({
+        from: process.env.SMTP_FROM || `"Benedicto College" <${process.env.SMTP_USER}>`,
+        to: parentEmail,
+        subject,
+        text: textBody,
+        html: htmlBody,
+      });
+      
+      console.log(`[StudentWelcome] ✓ Welcome email sent to ${parentEmail} for student ${studentName}`);
+      return true;
+    } else {
+      console.error('[StudentWelcome] No email transporter configured');
+      return false;
+    }
+  } catch (error: any) {
+    const errorMsg = error.message || error.toString();
+    console.error(`[StudentWelcome] ✗ Failed to send to ${parentEmail}: ${errorMsg}`);
+    return false;
+  }
+}

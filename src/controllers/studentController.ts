@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import Student, { GRADE_LEVELS, ALL_COURSES, COLLEGE_COURSES } from '../models/Student';
 import { ApiResponse, ApiErrorResponse, StudentAttributes } from '../types/models';
 import { uploadPhoto } from '../utils/uploadPhoto';
+import { sendStudentWelcomeEmail } from '../services/emailVerificationService';
 
 interface StudentBody {
   rfid_tag_uid: string;
@@ -213,6 +214,28 @@ export async function createStudent(
       parent_name,
       parent_email,
       parent_phone,
+    });
+
+    // Send welcome email to parent with RFID tag and registration link
+    const studentFullName = middle_name 
+      ? `${first_name} ${middle_name} ${last_name}` 
+      : `${first_name} ${last_name}`;
+    
+    // Get registration URL from environment or construct from request
+    const registrationUrl = process.env.PARENT_PORTAL_URL 
+      ? `${process.env.PARENT_PORTAL_URL}/parent/register`
+      : `${req.protocol}://${req.get('host')}/parent/register`;
+    
+    // Send email asynchronously (don't wait for it)
+    sendStudentWelcomeEmail(
+      parent_email,
+      parent_name,
+      studentFullName,
+      rfid_tag_uid,
+      registrationUrl
+    ).catch(err => {
+      console.error('[createStudent] Failed to send welcome email:', err);
+      // Don't fail the student creation if email fails
     });
 
     res.status(201).json({ success: true, data: student.toJSON() as StudentAttributes });
