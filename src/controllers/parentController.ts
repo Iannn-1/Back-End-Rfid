@@ -167,6 +167,7 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
 export async function getChild(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const parentId = (req as any).parent.id;
+    const parentRfid = (req as any).parent.rfid_tag_uid;
     const requestedRfid = req.query.rfid_tag_uid as string | undefined;
 
     // Get all children for this parent
@@ -175,11 +176,47 @@ export async function getChild(req: Request, res: Response, next: NextFunction):
       order: [['is_primary', 'DESC'], ['createdAt', 'ASC']],
     });
 
+    // BACKWARD COMPATIBILITY: If no entries in parent_students, use old method
     if (parentStudents.length === 0) {
-      res.status(404).json({ success: false, error: 'No children found for this parent' });
+      console.log(`[getChild] Parent ${parentId} has no entries in parent_students, using fallback`);
+      
+      // Use the rfid_tag_uid from parent record (old method)
+      const student = await Student.findOne({ where: { rfid_tag_uid: parentRfid } });
+      if (!student) {
+        res.status(404).json({ success: false, error: 'Child not found' });
+        return;
+      }
+
+      // Last 7 days of attendance
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      sevenDaysAgo.setHours(0, 0, 0, 0);
+
+      const logs = await AttendanceLog.findAll({
+        where: {
+          student_id: student.id,
+          scan_time: { [Op.gte]: sevenDaysAgo },
+        },
+        order: [['scan_time', 'DESC']],
+      });
+
+      // Current status: last log of today
+      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+      const todayEnd   = new Date(); todayEnd.setHours(23, 59, 59, 999);
+      const todayLogs  = logs.filter((l) => {
+        const t = new Date(l.scan_time);
+        return t >= todayStart && t <= todayEnd;
+      });
+      const currentStatus = todayLogs.length > 0 ? todayLogs[0].status : null;
+
+      res.status(200).json({
+        success: true,
+        data: { student, currentStatus, logs },
+      });
       return;
     }
 
+    // NEW METHOD: Use parent_students table
     // Determine which child to return
     let rfid_tag_uid: string;
     if (requestedRfid) {
