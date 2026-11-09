@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { Op } from 'sequelize';
-import { Parent, Student, AttendanceLog } from '../models/index';
+import { Parent, Student, AttendanceLog, ParentStudent } from '../models/index';
 import { ApiResponse, ApiErrorResponse } from '../types/models';
 import { generateVerificationCode, sendVerificationEmail, sendPasswordResetEmail } from '../services/emailVerificationService';
 
@@ -10,17 +10,44 @@ import { generateVerificationCode, sendVerificationEmail, sendPasswordResetEmail
 
 export async function register(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { name, email, password, phone, rfid_tag_uid } = req.body;
+    const { name, email, password, phone, rfid_tag_uid, rfid_tags } = req.body;
 
-    if (!name || !email || !password || !rfid_tag_uid) {
-      res.status(400).json({ success: false, error: 'name, email, password, and rfid_tag_uid are required' });
+    if (!name || !email || !password) {
+      res.status(400).json({ success: false, error: 'name, email, and password are required' });
       return;
     }
 
-    // Validate the RFID tag exists in students table
-    const student = await Student.findOne({ where: { rfid_tag_uid } });
-    if (!student) {
-      res.status(404).json({ success: false, error: 'No student found with that RFID tag. Please check the tag ID and try again.' });
+    // Support both single RFID tag (backward compatibility) and multiple tags
+    let tags: string[] = [];
+    if (rfid_tags && Array.isArray(rfid_tags) && rfid_tags.length > 0) {
+      tags = rfid_tags;
+    } else if (rfid_tag_uid) {
+      tags = [rfid_tag_uid];
+    } else {
+      res.status(400).json({ success: false, error: 'At least one RFID tag is required' });
+      return;
+    }
+
+    // Remove duplicates and empty strings
+    tags = [...new Set(tags.filter(tag => tag && tag.trim()))];
+
+    if (tags.length === 0) {
+      res.status(400).json({ success: false, error: 'At least one valid RFID tag is required' });
+      return;
+    }
+
+    // Validate all RFID tags exist in students table
+    const students = await Student.findAll({ 
+      where: { rfid_tag_uid: { [Op.in]: tags } } 
+    });
+
+    if (students.length !== tags.length) {
+      const foundTags = students.map(s => s.rfid_tag_uid);
+      const notFoundTags = tags.filter(tag => !foundTags.includes(tag));
+      res.status(404).json({ 
+        success: false, 
+        error: `No student found with RFID tag(s): ${notFoundTags.join(', ')}. Please check the tag IDs and try again.` 
+      });
       return;
     }
 
@@ -38,16 +65,26 @@ export async function register(req: Request, res: Response, next: NextFunction):
     const verificationExpires = new Date();
     verificationExpires.setMinutes(verificationExpires.getMinutes() + 15);
     
+    // Create parent with first RFID tag for backward compatibility
     const parent = await Parent.create({ 
       name, 
       email, 
       password_hash, 
       phone, 
-      rfid_tag_uid,
+      rfid_tag_uid: tags[0], // First tag as primary
       email_verified: false,
       verification_code: verificationCode,
       verification_code_expires: verificationExpires
     });
+
+    // Add all RFID tags to ParentStudent junction table
+    for (let i = 0; i < tags.length; i++) {
+      await ParentStudent.create({
+        parent_id: parent.id,
+        rfid_tag_uid: tags[i],
+        is_primary: i === 0, // First tag is primary
+      });
+    }
 
     // Send verification email
     const emailSent = await sendVerificationEmail(email, name, verificationCode);
@@ -63,7 +100,7 @@ export async function register(req: Request, res: Response, next: NextFunction):
         id: parent.id, 
         name: parent.name, 
         email: parent.email, 
-        rfid_tag_uid: parent.rfid_tag_uid,
+        rfid_tags: tags,
         email_verified: false
       },
     });
@@ -129,7 +166,35 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
 
 export async function getChild(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { rfid_tag_uid } = (req as any).parent;
+    const parentId = (req as any).parent.id;
+    const requestedRfid = req.query.rfid_tag_uid as string | undefined;
+
+    // Get all children for this parent
+    const parentStudents = await ParentStudent.findAll({
+      where: { parent_id: parentId },
+      order: [['is_primary', 'DESC'], ['createdAt', 'ASC']],
+    });
+
+    if (parentStudents.length === 0) {
+      res.status(404).json({ success: false, error: 'No children found for this parent' });
+      return;
+    }
+
+    // Determine which child to return
+    let rfid_tag_uid: string;
+    if (requestedRfid) {
+      // Check if requested RFID belongs to this parent
+      const hasAccess = parentStudents.some(ps => ps.rfid_tag_uid === requestedRfid);
+      if (!hasAccess) {
+        res.status(403).json({ success: false, error: 'Access denied to this student' });
+        return;
+      }
+      rfid_tag_uid = requestedRfid;
+    } else {
+      // Return primary child or first child
+      const primary = parentStudents.find(ps => ps.is_primary);
+      rfid_tag_uid = primary ? primary.rfid_tag_uid : parentStudents[0].rfid_tag_uid;
+    }
 
     const student = await Student.findOne({ where: { rfid_tag_uid } });
     if (!student) {
@@ -413,6 +478,148 @@ export async function resetPassword(req: Request, res: Response, next: NextFunct
     res.status(200).json({
       success: true,
       message: 'Password reset successfully! You can now login with your new password.',
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Get All Children ───────────────────────────────────────────────────────
+
+export async function getAllChildren(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const parentId = (req as any).parent.id;
+
+    // Get all children for this parent
+    const parentStudents = await ParentStudent.findAll({
+      where: { parent_id: parentId },
+      order: [['is_primary', 'DESC'], ['createdAt', 'ASC']],
+    });
+
+    if (parentStudents.length === 0) {
+      res.status(200).json({
+        success: true,
+        data: { children: [] },
+      });
+      return;
+    }
+
+    const rfidTags = parentStudents.map(ps => ps.rfid_tag_uid);
+
+    // Fetch all student details
+    const students = await Student.findAll({
+      where: { rfid_tag_uid: { [Op.in]: rfidTags } },
+    });
+
+    // Map students with is_primary flag
+    const children = students.map(student => {
+      const ps = parentStudents.find(p => p.rfid_tag_uid === student.rfid_tag_uid);
+      return {
+        ...student.toJSON(),
+        is_primary: ps?.is_primary || false,
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      data: { children },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Add Child ──────────────────────────────────────────────────────────────
+
+export async function addChild(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const parentId = (req as any).parent.id;
+    const { rfid_tag_uid } = req.body;
+
+    if (!rfid_tag_uid) {
+      res.status(400).json({ success: false, error: 'rfid_tag_uid is required' });
+      return;
+    }
+
+    // Validate the RFID tag exists in students table
+    const student = await Student.findOne({ where: { rfid_tag_uid } });
+    if (!student) {
+      res.status(404).json({ 
+        success: false, 
+        error: 'No student found with that RFID tag. Please check the tag ID and try again.' 
+      });
+      return;
+    }
+
+    // Check if already added
+    const existing = await ParentStudent.findOne({
+      where: { parent_id: parentId, rfid_tag_uid },
+    });
+
+    if (existing) {
+      res.status(409).json({ success: false, error: 'This child is already added to your account' });
+      return;
+    }
+
+    // Add the child
+    await ParentStudent.create({
+      parent_id: parentId,
+      rfid_tag_uid,
+      is_primary: false,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Child added successfully!',
+      data: { student },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Set Primary Child ──────────────────────────────────────────────────────
+
+export async function setPrimaryChild(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const parentId = (req as any).parent.id;
+    const { rfid_tag_uid } = req.body;
+
+    if (!rfid_tag_uid) {
+      res.status(400).json({ success: false, error: 'rfid_tag_uid is required' });
+      return;
+    }
+
+    // Check if this child belongs to the parent
+    const parentStudent = await ParentStudent.findOne({
+      where: { parent_id: parentId, rfid_tag_uid },
+    });
+
+    if (!parentStudent) {
+      res.status(404).json({ success: false, error: 'Child not found in your account' });
+      return;
+    }
+
+    // Unset all primary flags for this parent
+    await ParentStudent.update(
+      { is_primary: false },
+      { where: { parent_id: parentId } }
+    );
+
+    // Set the new primary child
+    parentStudent.is_primary = true;
+    await parentStudent.save();
+
+    // Update parent's primary rfid_tag_uid for backward compatibility
+    const parent = await Parent.findByPk(parentId);
+    if (parent) {
+      parent.rfid_tag_uid = rfid_tag_uid;
+      await parent.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Primary child updated successfully!',
     });
   } catch (err) {
     next(err);
