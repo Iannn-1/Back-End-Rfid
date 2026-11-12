@@ -38,6 +38,7 @@ export interface StudentAttributes {
   parent_name: string
   parent_email: string
   parent_phone: string
+  archived: boolean
   createdAt?: Date
   updatedAt?: Date
 }
