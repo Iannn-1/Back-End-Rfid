@@ -77,11 +77,12 @@ export function determineStatus(lastLog: AttendanceLogAttributes | null): 'IN' |
  *
  * Steps:
  *   1. Look up the student by rfid_tag_uid — throw NotFoundError (404) if absent.
- *   2. Query the student's last attendance log for today.
- *   3. Call determineStatus() to get the next status.
- *   4. Persist a new AttendanceLog record.
- *   5. Fire-and-forget sendParentNotification (void, non-blocking).
- *   6. Return { student, log } as ScanResult.
+ *   2. Check if student is archived or inactive — throw error if true.
+ *   3. Query the student's last attendance log for today.
+ *   4. Call determineStatus() to get the next status.
+ *   5. Persist a new AttendanceLog record.
+ *   6. Fire-and-forget sendParentNotification (void, non-blocking).
+ *   7. Return { student, log } as ScanResult.
  *
  * Requirements: 1.1, 1.2, 1.5, 2.4, 2.5
  */
@@ -92,7 +93,15 @@ export async function processRfidScan(rfid_tag_uid: string): Promise<ScanResult>
     throw new NotFoundError(`Student not found for RFID tag: ${rfid_tag_uid}`);
   }
 
-  // Step 2: Find last log for this student today
+  // Step 2: Check if student is archived or inactive
+  if (student.archived) {
+    throw new Error('This student card has been archived and is no longer active. Please contact the admin office.');
+  }
+  if (student.status === 'Inactive') {
+    throw new Error('This student card is inactive. Please contact the admin office.');
+  }
+
+  // Step 3: Find last log for this student today
   const { todayStart, todayEnd } = getTodayRange();
 
   const lastLog = await AttendanceLog.findOne({
@@ -108,22 +117,22 @@ export async function processRfidScan(rfid_tag_uid: string): Promise<ScanResult>
     ],
   });
 
-  // Step 3: Determine the next status
+  // Step 4: Determine the next status
   const status = determineStatus(lastLog ? (lastLog.get() as AttendanceLogAttributes) : null);
 
-  // Step 4: Persist new log
+  // Step 5: Persist new log
   const log = await AttendanceLog.create({
     student_id: student.id,
     status,
   });
 
-  // Step 5: Fire-and-forget notification (Requirements 1.5, 3.4)
+  // Step 6: Fire-and-forget notification (Requirements 1.5, 3.4)
   void sendParentNotification(
     student.get() as import('../types/models').StudentAttributes,
     log.get() as AttendanceLogAttributes,
   );
 
-  // Step 6: Return result
+  // Step 7: Return result
   return {
     student: student.get() as import('../types/models').StudentAttributes,
     log: log.get() as AttendanceLogAttributes,

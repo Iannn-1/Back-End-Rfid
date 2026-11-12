@@ -389,6 +389,7 @@ export async function updateStudent(
  * DELETE /api/v1/students/:id
  * Archives a student instead of permanently deleting them.
  * Archived students are hidden from the main list but can be restored later.
+ * Also sets status to 'Inactive' to prevent RFID scanning.
  */
 export async function deleteStudent(
   req: Request<{ id: string }>,
@@ -402,8 +403,11 @@ export async function deleteStudent(
       return;
     }
 
-    // Archive instead of delete
-    await student.update({ archived: true });
+    // Archive and disable the student
+    await student.update({ 
+      archived: true,
+      status: 'Inactive' // Prevent RFID scanning
+    });
     res.status(200).json({ success: true, data: { message: 'Student archived successfully' } });
   } catch (err: any) {
     next(err);
@@ -413,6 +417,7 @@ export async function deleteStudent(
 /**
  * POST /api/v1/students/:id/restore
  * Restores an archived student back to active status.
+ * Also sets status to 'Active' to allow RFID scanning again.
  */
 export async function restoreStudent(
   req: Request<{ id: string }>,
@@ -431,8 +436,11 @@ export async function restoreStudent(
       return;
     }
 
-    // Restore from archive
-    await student.update({ archived: false });
+    // Restore from archive and reactivate
+    await student.update({ 
+      archived: false,
+      status: 'Active' // Allow RFID scanning again
+    });
     res.status(200).json({ success: true, data: { message: 'Student restored successfully' } });
   } catch (err: any) {
     next(err);
