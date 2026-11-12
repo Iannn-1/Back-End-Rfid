@@ -5,7 +5,7 @@ import { StudentAttributes } from '../types/models';
 // id, createdAt, updatedAt and optional fields are auto-generated or optional on creation
 type StudentCreationAttributes = Optional<
   StudentAttributes,
-  'id' | 'email' | 'course' | 'profile_photo' | 'signature' | 'createdAt' | 'updatedAt'
+  'id' | 'email' | 'course' | 'profile_photo' | 'signature' | 'archived' | 'createdAt' | 'updatedAt'
 >;
 
 // ---------------------------------------------------------------------------
