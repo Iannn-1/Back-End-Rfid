@@ -259,6 +259,7 @@ export async function createStudent(
 /**
  * GET /api/v1/students
  * Returns all students, optionally filtered by student_level or status.
+ * By default, archived students are excluded unless explicitly requested.
  */
 export async function listStudents(
   req: Request,
@@ -266,9 +267,16 @@ export async function listStudents(
   next: NextFunction
 ): Promise<void> {
   try {
-    const where: Record<string, string> = {};
+    const where: Record<string, string | boolean> = {};
     if (req.query.student_level) where.student_level = req.query.student_level as string;
     if (req.query.status) where.status = req.query.status as string;
+    
+    // Exclude archived students by default, unless explicitly requested
+    if (req.query.archived === 'true') {
+      where.archived = true;
+    } else if (req.query.archived !== 'all') {
+      where.archived = false;
+    }
 
     const students = await Student.findAll({ where, order: [['last_name', 'ASC'], ['first_name', 'ASC']] });
     res.status(200).json({ success: true, data: students });
@@ -379,7 +387,8 @@ export async function updateStudent(
 
 /**
  * DELETE /api/v1/students/:id
- * Deletes a student (blocked if they have attendance logs — ON DELETE RESTRICT).
+ * Archives a student instead of permanently deleting them.
+ * Archived students are hidden from the main list but can be restored later.
  */
 export async function deleteStudent(
   req: Request<{ id: string }>,
@@ -393,13 +402,39 @@ export async function deleteStudent(
       return;
     }
 
-    await student.destroy();
-    res.status(200).json({ success: true, data: { message: 'Student deleted successfully' } });
+    // Archive instead of delete
+    await student.update({ archived: true });
+    res.status(200).json({ success: true, data: { message: 'Student archived successfully' } });
   } catch (err: any) {
-    if (err.name === 'SequelizeForeignKeyConstraintError') {
-      res.status(409).json({ success: false, error: 'Cannot delete student with existing attendance logs' });
+    next(err);
+  }
+}
+
+/**
+ * POST /api/v1/students/:id/restore
+ * Restores an archived student back to active status.
+ */
+export async function restoreStudent(
+  req: Request<{ id: string }>,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const student = await Student.findByPk(req.params.id);
+    if (!student) {
+      res.status(404).json({ success: false, error: 'Student not found' });
       return;
     }
+
+    if (!student.archived) {
+      res.status(400).json({ success: false, error: 'Student is not archived' });
+      return;
+    }
+
+    // Restore from archive
+    await student.update({ archived: false });
+    res.status(200).json({ success: true, data: { message: 'Student restored successfully' } });
+  } catch (err: any) {
     next(err);
   }
 }

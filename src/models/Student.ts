@@ -82,6 +82,7 @@ class Student
   public parent_name!: string;
   public parent_email!: string;
   public parent_phone!: string;
+  public archived!: boolean;
 
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -178,6 +179,11 @@ Student.init(
     parent_phone: {
       type: DataTypes.STRING(255),
       allowNull: false,
+    },
+    archived: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
     },
   },
   {

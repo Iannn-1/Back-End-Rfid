@@ -6,6 +6,7 @@ import {
   getStudent,
   updateStudent,
   deleteStudent,
+  restoreStudent,
   getStudentOptions,
 } from '../controllers/studentController';
 
@@ -21,5 +22,6 @@ router.get('/', listStudents);
 router.get('/:id', getStudent);
 router.put('/:id', updateStudent);
 router.delete('/:id', deleteStudent);
+router.post('/:id/restore', restoreStudent);
 
 export default router;
